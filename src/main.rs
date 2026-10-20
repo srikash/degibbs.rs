@@ -34,7 +34,7 @@ struct Cli {
     /// Do not look for a sidecar
     #[arg(long)]
     no_json: bool,
-    /// Number of subvoxel shifts M (shifts of s/(2M) voxel, s = -M..M-1)
+    /// Number of subvoxel shifts M (shifts of s/(2M) voxel, s = -M..M)
     #[arg(long, default_value_t = 20)]
     nshifts: usize,
     /// Start of the oscillation window

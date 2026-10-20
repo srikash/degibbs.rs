@@ -27,7 +27,13 @@ Gibbs-ringing removal for magnitude MRI, in pure Rust.
 
 ## Quick start
 
-Install (needs Rust 1.85 or newer; this puts `degibbs` on your `PATH`):
+Download the static Linux binary (x86-64) from the [v0.1.5 release](https://github.com/srikash/degibbs.rs/releases/tag/v0.1.5). It runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, and Fedora 44. Use `gh release download v0.1.5 -R srikash/degibbs.rs` while the repository is private.
+
+```
+tar xzf degibbs-v0.1.5-x86_64-linux-musl.tar.gz
+```
+
+Or build from source (needs Rust 1.85 or newer; this puts `degibbs` on your `PATH`):
 
 ```
 cargo install --git https://github.com/srikash/degibbs.rs
@@ -89,7 +95,7 @@ mrconvert dwi_degibbs.nii.gz out.mif -fslgrad dwi.bvec dwi.bval
 
 ## Containers (Docker and Apptainer)
 
-A multi-architecture image (linux/amd64 and linux/arm64, about 18 MB) is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. Tags: `latest` (tracks `main`), `main`, version tags such as `0.1.0` once released, and `sha-<commit>`.
+A multi-architecture image (linux/amd64 and linux/arm64, about 18 MB) is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. Tags: `latest` (tracks `main`), `main`, `0.1.5` (the current release), and `sha-<commit>`.
 
 The package is private while the repository is private. Log in first with a GitHub token that has the `read:packages` scope.
 
@@ -122,9 +128,9 @@ Pass the factor the scan was acquired with. The sidecar's `PartialFourier` sets 
 | acquired | `--pf` | expected result |
 |---|---|---|
 | full Fourier | `1` | the standard Kellner correction |
-| 7/8 | `7/8` | removes more ringing than `1` |
-| 6/8 | `6/8` | removes more ringing than `1` |
-| 5/8 | `5/8` | little or no benefit; ringing remains and the image blurs |
+| 7/8 | `7/8` | removes more ringing than `1`; edges lose some accuracy |
+| 6/8 | `6/8` | removes more ringing than `1`; edges lose some accuracy |
+| 5/8 | `5/8` | modest benefit (about 10% in the phantom); strong ringing remains and edges blur |
 
 A mismatched value gives a smaller gain, and `5/8` on any other data makes the result worse. The RPG paper recommends 6/8 over 5/8 when you have a choice at acquisition.
 
@@ -132,32 +138,35 @@ A mismatched value gives a smaller gain, and `5/8` on any other data makes the r
 
 ### Setup
 
-- The phantom is a 96 × 96 slice of a high-resolution object (ellipses and a rectangle, with a smooth phase), sampled 8× finer.
-- Its k-space is truncated to 96 lines. For partial Fourier, the missing lines on one side of k-space are zeroed.
+- The phantom is the modified Shepp-Logan head (Toft, 1996), scaled so the skull is 100 and the brain 20. It is multiplied by a smooth phase map, as in real data.
+- A 96 × 96 slice is sampled from the object at 8× the resolution, so k-space truncation produces true Gibbs ringing.
+- For partial Fourier, the missing lines on one side of k-space are zeroed.
 - The magnitude is then taken, as for zero-filled scanner data.
 - The truth is the high-resolution object averaged into voxels.
-- Errors are RMSE against that truth, measured more than 4 voxels from any edge, so they show ringing rather than edge blur.
+- Far-field error is the RMSE against that truth, measured more than 4 voxels from any edge. It shows ringing rather than edge blur. Near-edge error is measured within 2 voxels of an edge.
 
 ### Results
 
-Far-field RMSE (lower is better; bold marks the best correction in each row):
+Far-field RMSE (lower is better; bold marks the best correction in each row, and both when they are within 1%):
 
 | acquired | none | `--pf 1` | `--pf 7/8` | `--pf 6/8` | `--pf 5/8` |
 |---|---|---|---|---|---|
-| full Fourier | 0.649 | **0.392** | 0.405 | **0.392** | 1.228 |
-| 7/8 | 0.782 | 0.668 | **0.639** | 0.677 | 1.269 |
-| 6/8 | 1.023 | 0.929 | 0.915 | **0.852** | 1.381 |
-| 5/8 | 1.878 | 1.835 | 1.841 | **1.826** | 1.891 |
+| full Fourier | 0.782 | **0.472** | 0.478 | **0.468** | 0.857 |
+| 7/8 | 0.768 | 0.563 | **0.523** | 0.559 | 0.861 |
+| 6/8 | 0.851 | 0.686 | 0.672 | **0.626** | 0.884 |
+| 5/8 | 1.372 | 1.282 | 1.286 | 1.265 | **1.239** |
 
 ### Findings
 
-- Full-Fourier data improves by about 40%.
-- For 7/8 and 6/8 data, the matching setting removes 17–18% of the error and does better than treating the data as full Fourier.
-- The `5/8` setting increases the error on every other data set.
-- On 5/8 data nothing helps much. The best result is a 3% gain, and the matching `5/8` setting is slightly worse than doing nothing.
-- Edge error is 14–15.5 in every case. It comes from the resolution lost to k-space truncation, which no correction recovers.
+- Full-Fourier data improves by 40%.
+- For 7/8 and 6/8 data, the matching setting removes 32% and 26% of the far-field error. That is 7% and 9% better than treating the data as full Fourier.
+- The `5/8` setting increases the far-field error on every other data set, by 4% to 12%.
+- On 5/8 data the matching setting gives a 10% gain and the best result. A large error remains (1.239, against 0.47 to 0.63 for the other data sets).
+- Partial-Fourier corrections cost some edge accuracy. Near-edge error rises from 4.0 to 4.5 (7/8), 4.2 to 4.7 (6/8) and 6.4 to 8.4 (5/8), while full-Fourier data improves from 4.2 to 3.6.
+- Over the whole image, edges included, the partial-Fourier corrections do not lower the RMSE. It rises from 2.78 to 3.05 (7/8), 2.97 to 3.24 (6/8) and 4.52 to 5.73 (5/8). Full-Fourier data improves from 2.92 to 2.43, and `--pf 1` on 7/8 data gives 2.64.
 - Zeroing the other side of k-space gives the same picture.
-- With noise at SNR 30 (five seeds), the error floor is about 1.7 and the best setting gains about 10% (5% on 5/8 data). The matching setting is still best for 7/8 and 6/8 data, and `5/8` still hurts the other three.
+- With noise at SNR 30 (five seeds), the matching setting is still best for 7/8, 6/8 and 5/8 data. The gains are 27%, 24% and 10%. The `5/8` setting still increases the error on every other data set.
+- The size of the gain depends on the phase. With zero phase (a purely real object), the gains shrink to 7% to 14%.
 
 ### Figures
 
@@ -167,7 +176,7 @@ Far-field RMSE (lower is better; bold marks the best correction in each row):
 
 ![Phase-encode profiles and RMSE heatmaps](docs/qc_profiles.png)
 
-*Phase-encode profiles through the phantom, and heatmaps of far-field RMSE, absolute and relative to uncorrected, for every acquired and correction factor.*
+*Phase-encode profiles through the brain (column 58), and heatmaps of far-field RMSE, absolute and relative to uncorrected, for every acquired and correction factor.*
 
 This is one phantom. Real data will differ, so read the table for the ordering, not for the size of the gains.
 
@@ -175,6 +184,8 @@ This is one phantom. Real data will differ, so read the table for the ordering, 
 
 - Magnitude (real-valued) images only. Complex images are not supported.
 - Supported partial-Fourier factors are 1, 7/8, 6/8 and 5/8.
+- For `5/8`, the original RPG code applies only the phase-encode unringing to magnitude data. This tool runs the pipeline described in the paper, so its `--pf 5/8` output differs from the original there. The other settings agree with it to within 0.02% (relative RMS) on the phantom.
+- The partial-Fourier pipelines model zero-filled reconstruction. The phantom tests do not cover data reconstructed with POCS, homodyne or similar methods.
 - Each plane needs lines longer than `maxw + 2` samples, including the sub-lines the partial-Fourier scheme creates.
 
 ## Licence and citing

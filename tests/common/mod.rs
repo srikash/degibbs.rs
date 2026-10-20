@@ -65,6 +65,44 @@ pub fn phantom_hi(nx: usize, ny: usize, r: usize) -> Vec<f64> {
     img
 }
 
+/// Modified Shepp-Logan head phantom (Toft 1996): `(amplitude, semi-axis a, semi-axis b, x0, y0, angle in degrees)`,
+/// coordinates in `[-1, 1]` with y running down the rows (the PE axis).
+const SHEPP_LOGAN: [(f64, f64, f64, f64, f64, f64); 10] = [
+    (1.0, 0.69, 0.92, 0.0, 0.0, 0.0),
+    (-0.8, 0.6624, 0.874, 0.0, -0.0184, 0.0),
+    (-0.2, 0.11, 0.31, 0.22, 0.0, -18.0),
+    (-0.2, 0.16, 0.41, -0.22, 0.0, 18.0),
+    (0.1, 0.21, 0.25, 0.0, 0.35, 0.0),
+    (0.1, 0.046, 0.046, 0.0, 0.1, 0.0),
+    (0.1, 0.046, 0.046, 0.0, -0.1, 0.0),
+    (0.1, 0.046, 0.023, -0.08, -0.605, 0.0),
+    (0.1, 0.023, 0.023, 0.0, -0.606, 0.0),
+    (0.1, 0.023, 0.046, 0.06, -0.605, 0.0),
+];
+
+/// Shepp-Logan phantom on an `(nx*r) x (ny*r)` grid, scaled so the skull is 100.
+pub fn shepp_logan_hi(nx: usize, ny: usize, r: usize) -> Vec<f64> {
+    let (hx, hy) = (nx * r, ny * r);
+    let mut img = vec![0.0; hx * hy];
+    for y in 0..hy {
+        for x in 0..hx {
+            let (u, v) = (
+                ((x as f64 + 0.5) / hx as f64) * 2.0 - 1.0,
+                ((y as f64 + 0.5) / hy as f64) * 2.0 - 1.0,
+            );
+            for &(amp, a, b, x0, y0, deg) in &SHEPP_LOGAN {
+                let (c, sn) = (deg.to_radians().cos(), deg.to_radians().sin());
+                let (dx, dy) = (u - x0, v - y0);
+                let (p, q) = (dx * c + dy * sn, -dx * sn + dy * c);
+                if (p / a).powi(2) + (q / b).powi(2) <= 1.0 {
+                    img[y * hx + x] += 100.0 * amp;
+                }
+            }
+        }
+    }
+    img
+}
+
 /// Signed frequency of FFT index `j` for length `n` (same convention as the library).
 pub fn freq(j: usize, n: usize) -> i64 {
     if j <= (n - 1) / 2 {
@@ -81,7 +119,7 @@ pub fn corrupted_and_truth(nx: usize, ny: usize, r: usize, nu: f64) -> (Plane, P
 }
 
 /// General form: `side = -1` zeroes the negative-ky side, `+1` the positive side; `phase` multiplies the
-/// object by a smooth phase map (the ground truth stays the magnitude).
+/// object by a smooth phase map, as in real data (the ground truth stays the magnitude).
 pub fn corrupted_and_truth_with(
     nx: usize,
     ny: usize,
@@ -90,8 +128,31 @@ pub fn corrupted_and_truth_with(
     side: i64,
     phase: bool,
 ) -> (Plane, Plane) {
+    corrupted_and_truth_from(&phantom_hi(nx, ny, r), nx, ny, r, nu, side, phase)
+}
+
+/// Same as `corrupted_and_truth_with` for the Shepp-Logan phantom.
+pub fn corrupted_and_truth_sl(
+    nx: usize,
+    ny: usize,
+    r: usize,
+    nu: f64,
+    side: i64,
+    phase: bool,
+) -> (Plane, Plane) {
+    corrupted_and_truth_from(&shepp_logan_hi(nx, ny, r), nx, ny, r, nu, side, phase)
+}
+
+fn corrupted_and_truth_from(
+    hi: &[f64],
+    nx: usize,
+    ny: usize,
+    r: usize,
+    nu: f64,
+    side: i64,
+    phase: bool,
+) -> (Plane, Plane) {
     let (hx, hy) = (nx * r, ny * r);
-    let hi = phantom_hi(nx, ny, r);
     let mut e = Engine::new();
     let mut h: Vec<C> = hi
         .iter()
@@ -104,9 +165,8 @@ pub fn corrupted_and_truth_with(
                 ((i % hx) as f64 + 0.5) / hx as f64,
                 ((i / hx) as f64 + 0.5) / hy as f64,
             );
-            let phi = 2.0
-                * std::f64::consts::PI
-                * (0.6 * u + 0.4 * (-((u - 0.5).powi(2) + (w - 0.5).powi(2)) / 0.1).exp());
+            let tau = 2.0 * std::f64::consts::PI;
+            let phi = 1.2 * (tau * 0.7 * u).sin() + (tau * 0.5 * w).cos();
             C::from_polar(v, phi)
         })
         .collect();

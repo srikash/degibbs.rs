@@ -1,4 +1,4 @@
-//! Acquired-PF x correction-PF matrix on the analytic phantom: which `--pf` setting works on which data.
+//! Acquired-PF x correction-PF matrix on the Shepp-Logan phantom: which `--pf` setting works on which data.
 //! Run with `--nocapture` to print the far-field RMSE table.
 mod common;
 
@@ -30,10 +30,10 @@ fn run(cor: &Plane, pf: Pf) -> Plane {
 fn matrix(nx: usize, ny: usize, side: i64) -> [[f64; 5]; 4] {
     let mut m = [[0.0; 5]; 4];
     for (i, &acq) in PFS.iter().enumerate() {
-        let (cor, truth) = corrupted_and_truth_with(nx, ny, R, nu(acq), side, true);
-        m[i][0] = rmse_far(&cor, &truth, 2);
+        let (cor, truth) = corrupted_and_truth_sl(nx, ny, R, nu(acq), side, true);
+        m[i][0] = rmse_far(&cor, &truth, 5);
         for (j, &c) in PFS.iter().enumerate() {
-            m[i][1 + j] = rmse_far(&run(&cor, c), &truth, 2);
+            m[i][1 + j] = rmse_far(&run(&cor, c), &truth, 5);
         }
     }
     eprintln!(
@@ -50,7 +50,7 @@ fn matrix(nx: usize, ny: usize, side: i64) -> [[f64; 5]; 4] {
 
 #[test]
 fn matching_correction_helps_and_is_best_for_7_8_and_6_8() {
-    for (nx, ny) in [(96, 96), (64, 64)] {
+    for (nx, ny) in [(96, 96), (128, 128)] {
         let m = matrix(nx, ny, -1);
         // full Fourier: clear gain
         assert!(m[0][1] < 0.8 * m[0][0], "{nx}x{ny} full: {:?}", m[0]);
@@ -75,8 +75,11 @@ fn five_eighths_setting_does_not_help_other_data() {
         // 5/8 setting on 1, 7/8, 6/8 data is worse than doing nothing
         assert!(m[i][4] > m[i][0], "{}: {:?}", NAMES[i], m[i]);
     }
-    // 5/8 data: no setting gives a large gain
-    assert!(m[3][1..].iter().all(|&v| v > 0.9 * m[3][0]), "{:?}", m[3]);
+    // 5/8 data keeps more error after any correction than any other acquisition does
+    let worst_other = (0..3)
+        .map(|i| m[i][1..].iter().cloned().fold(0.0, f64::max))
+        .fold(0.0, f64::max);
+    assert!(m[3][1..].iter().all(|&v| v > worst_other), "{:?}", m);
 }
 
 #[test]

@@ -48,7 +48,7 @@ fn shifted_naive(line: &[f64], sigma: f64, zero_nyquist: bool) -> Vec<f64> {
 fn reference(line: &[f64], p: &ShiftParams) -> Vec<f64> {
     let n = line.len() as i64;
     let m = p.nshifts as i64;
-    let imgs: Vec<Vec<f64>> = (-m..m)
+    let imgs: Vec<Vec<f64>> = (-m..=m)
         .map(|s| {
             if s == 0 {
                 line.to_vec()

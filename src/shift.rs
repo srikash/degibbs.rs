@@ -5,7 +5,7 @@ use anyhow::{Result, bail};
 use rustfft::num_complex::Complex64 as C;
 use std::f64::consts::PI;
 
-/// Kernel parameters: `nshifts` = M (shifts `s = -M..M-1`, step `1/(2M)` voxel),
+/// Kernel parameters: `nshifts` = M (shifts `s = -M..=M`, step `1/(2M)` voxel),
 /// oscillation window `[min_w, max_w]`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ShiftParams {
@@ -62,7 +62,7 @@ impl Engine {
             );
         }
         let m = p.nshifts;
-        let ns = 2 * m;
+        let ns = 2 * m + 1;
         let mut shifted = std::mem::take(&mut self.shifted);
         let mut absdiff = std::mem::take(&mut self.absdiff);
         let mut spec = std::mem::take(&mut self.spec);
