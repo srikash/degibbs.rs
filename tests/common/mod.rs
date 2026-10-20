@@ -66,7 +66,7 @@ pub fn phantom_hi(nx: usize, ny: usize, r: usize) -> Vec<f64> {
 }
 
 /// Modified Shepp-Logan head phantom (Toft 1996): `(amplitude, semi-axis a, semi-axis b, x0, y0, angle in degrees)`,
-/// coordinates in `[-1, 1]` with y running down the rows (the PE axis).
+/// coordinates in `[-1, 1]` with y pointing up while the rows (the PE axis) run downwards.
 const SHEPP_LOGAN: [(f64, f64, f64, f64, f64, f64); 10] = [
     (1.0, 0.69, 0.92, 0.0, 0.0, 0.0),
     (-0.8, 0.6624, 0.874, 0.0, -0.0184, 0.0),
@@ -88,7 +88,7 @@ pub fn shepp_logan_hi(nx: usize, ny: usize, r: usize) -> Vec<f64> {
         for x in 0..hx {
             let (u, v) = (
                 ((x as f64 + 0.5) / hx as f64) * 2.0 - 1.0,
-                ((y as f64 + 0.5) / hy as f64) * 2.0 - 1.0,
+                1.0 - ((y as f64 + 0.5) / hy as f64) * 2.0,
             );
             for &(amp, a, b, x0, y0, deg) in &SHEPP_LOGAN {
                 let (c, sn) = (deg.to_radians().cos(), deg.to_radians().sin());

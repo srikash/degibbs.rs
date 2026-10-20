@@ -139,6 +139,7 @@ A mismatched value gives a smaller gain, and `5/8` on any other data makes the r
 ### Setup
 
 - The phantom is the modified Shepp-Logan head (Toft, 1996), scaled so the skull is 100 and the brain 20. It is multiplied by a smooth phase map, as in real data.
+- The RPG paper reports the same behaviour on its 90 × 90 Shepp-Logan phantom: robust removal for 7/8 and 6/8, and blurring with remaining ringing for 5/8.
 - A 96 × 96 slice is sampled from the object at 8× the resolution, so k-space truncation produces true Gibbs ringing.
 - For partial Fourier, the missing lines on one side of k-space are zeroed.
 - The magnitude is then taken, as for zero-filled scanner data.
@@ -147,26 +148,26 @@ A mismatched value gives a smaller gain, and `5/8` on any other data makes the r
 
 ### Results
 
-Far-field RMSE (lower is better; bold marks the best correction in each row, and both when they are within 1%):
+Far-field RMSE (lower is better; bold marks the best correction in each row, and both when they are within 2%):
 
 | acquired | none | `--pf 1` | `--pf 7/8` | `--pf 6/8` | `--pf 5/8` |
 |---|---|---|---|---|---|
-| full Fourier | 0.782 | **0.472** | 0.478 | **0.468** | 0.857 |
-| 7/8 | 0.768 | 0.563 | **0.523** | 0.559 | 0.861 |
-| 6/8 | 0.851 | 0.686 | 0.672 | **0.626** | 0.884 |
-| 5/8 | 1.372 | 1.282 | 1.286 | 1.265 | **1.239** |
+| full Fourier | 0.779 | **0.477** | 0.486 | **0.472** | 0.841 |
+| 7/8 | 0.771 | 0.566 | **0.524** | 0.561 | 0.841 |
+| 6/8 | 0.852 | 0.687 | 0.673 | **0.622** | 0.886 |
+| 5/8 | 1.368 | 1.279 | 1.279 | 1.261 | **1.236** |
 
 ### Findings
 
-- Full-Fourier data improves by 40%.
-- For 7/8 and 6/8 data, the matching setting removes 32% and 26% of the far-field error. That is 7% and 9% better than treating the data as full Fourier.
-- The `5/8` setting increases the far-field error on every other data set, by 4% to 12%.
-- On 5/8 data the matching setting gives a 10% gain and the best result. A large error remains (1.239, against 0.47 to 0.63 for the other data sets).
-- Partial-Fourier corrections cost some edge accuracy. Near-edge error rises from 4.0 to 4.5 (7/8), 4.2 to 4.7 (6/8) and 6.4 to 8.4 (5/8), while full-Fourier data improves from 4.2 to 3.6.
-- Over the whole image, edges included, the partial-Fourier corrections do not lower the RMSE. It rises from 2.78 to 3.05 (7/8), 2.97 to 3.24 (6/8) and 4.52 to 5.73 (5/8). Full-Fourier data improves from 2.92 to 2.43, and `--pf 1` on 7/8 data gives 2.64.
+- Full-Fourier data improves by 39%.
+- For 7/8 and 6/8 data, the matching setting removes 32% and 27% of the far-field error. That is 7% and 9% better than treating the data as full Fourier.
+- The `5/8` setting increases the far-field error on every other data set, by 4% to 9%.
+- On 5/8 data the matching setting gives a 10% gain and the best result. A large error remains (1.236, against 0.47 to 0.62 for the other data sets).
+- Partial-Fourier corrections cost some edge accuracy. Near-edge error rises from 4.0 to 4.3 (7/8), 4.2 to 4.7 (6/8) and 6.4 to 8.4 (5/8), while full-Fourier data improves from 4.2 to 3.5.
+- Over the whole image, edges included, the partial-Fourier corrections do not lower the RMSE. It rises from 2.78 to 2.96 (7/8), 2.96 to 3.24 (6/8) and 4.52 to 5.76 (5/8). Full-Fourier data improves from 2.91 to 2.39, and `--pf 1` on 7/8 data gives 2.64.
 - Zeroing the other side of k-space gives the same picture.
-- With noise at SNR 30 (five seeds), the matching setting is still best for 7/8, 6/8 and 5/8 data. The gains are 27%, 24% and 10%. The `5/8` setting still increases the error on every other data set.
-- The size of the gain depends on the phase. With zero phase (a purely real object), the gains shrink to 7% to 14%.
+- With noise at SNR 30 (five seeds), the matching setting is still best for 7/8, 6/8 and 5/8 data. The gains are 26%, 24% and 10%. The `5/8` setting still increases the error on every other data set.
+- The size of the gain depends on the phase. With zero phase (a purely real object), the gains shrink to 8% to 15%.
 
 ### Figures
 
