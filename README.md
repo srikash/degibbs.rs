@@ -61,4 +61,16 @@ and metamorphic checks (transposed planes, permuted axes).
 
 ## Licence
 
-The NYU Non-Commercial Research License, copied unchanged from [NYU-DiffusionMRI/rpg-degibbs](https://github.com/NYU-DiffusionMRI/rpg-degibbs) (see `LICENSE`): non-commercial research only, not for clinical care, no patent rights granted. The licence requires publications to cite Lee et al., MRM 2021 (doi:10.1002/mrm.28830). Please also cite Kellner et al., MRM 2016 (doi:10.1002/mrm.26054), whose method it builds on.
+The NYU Non-Commercial Research License, copied unchanged from [NYU-DiffusionMRI/rpg-degibbs](https://github.com/NYU-DiffusionMRI/rpg-degibbs) (see `LICENSE`): non-commercial research only, not for clinical care, no patent rights granted.
+
+## Citing
+
+The licence (clause 6) requires any publication of research that involves this software to cite:
+
+- **Lee, Novikov, Fieremans.** Removal of partial Fourier-induced Gibbs (RPG) ringing artifacts in MRI. *Magn Reson Med* 86(5):2733-2750, 2021. [doi:10.1002/mrm.28830](https://doi.org/10.1002/mrm.28830). This is the partial-Fourier method implemented here (`--pf 7/8`, `6/8`, `5/8`).
+
+Please also cite the method that RPG extends, which is the full-Fourier part of this tool (`--pf 1`) and the building block of the partial-Fourier pipelines:
+
+- **Kellner, Dhital, Kiselev, Reisert.** Gibbs-ringing artifact removal based on local subvoxel-shifts. *Magn Reson Med* 76(5):1574-1581, 2016. [doi:10.1002/mrm.26054](https://doi.org/10.1002/mrm.26054).
+
+Both references are in [`CITATION.bib`](CITATION.bib) for BibTeX/BibLaTeX.
