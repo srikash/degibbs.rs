@@ -15,7 +15,6 @@ struct Ellipse {
 }
 
 /// Phantom in unit coordinates (0..1 across the FOV); later shapes overwrite earlier ones.
-/// `shift` moves everything by a fraction of a low-res voxel so edges sit at varied sub-voxel positions.
 fn shapes() -> Vec<Ellipse> {
     vec![
         Ellipse {
@@ -259,6 +258,21 @@ fn rmse_where(a: &Plane, truth: &Plane, w: usize, want_flat: bool) -> f64 {
 /// RMSE over pixels far from any edge: pure ringing, edge blur excluded.
 pub fn rmse_far(a: &Plane, truth: &Plane, w: usize) -> f64 {
     rmse_where(a, truth, w, true)
+}
+
+/// RMSE over flat pixels (as `rmse_far`) where the truth exceeds `min_truth`: tissue plateaus, no background.
+pub fn rmse_far_above(a: &Plane, truth: &Plane, w: usize, min_truth: f64) -> f64 {
+    let (mut acc, mut cnt) = (0.0, 0usize);
+    for y in 0..a.ny {
+        for x in 0..a.nx {
+            let i = y * a.nx + x;
+            if truth.data[i] > min_truth && is_flat(truth, y, x, w) {
+                acc += (a.data[i] - truth.data[i]).powi(2);
+                cnt += 1;
+            }
+        }
+    }
+    (acc / cnt as f64).sqrt()
 }
 
 /// RMSE over edge pixels (blur and bias).

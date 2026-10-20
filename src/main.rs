@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 /// Gibbs-ringing removal by local subvoxel shifts (Kellner 2016) with partial-Fourier support (Lee 2021).
 ///
-/// Operates on magnitude NIfTI images. The phase-encoding axis and partial-Fourier factor can be read from a
+/// The input must be a magnitude NIfTI image. The phase-encoding axis and partial-Fourier factor can be read from a
 /// BIDS JSON sidecar (PhaseEncodingDirection, PartialFourier, SliceEncodingDirection); flags override it.
 #[derive(Parser, Debug)]
 #[command(version)]
