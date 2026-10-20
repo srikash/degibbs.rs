@@ -89,7 +89,7 @@ mrconvert dwi_degibbs.nii.gz out.mif -fslgrad dwi.bvec dwi.bval
 
 ## Containers (Docker and Apptainer)
 
-A linux/amd64 image (about 18 MB) is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. Tags: `latest` (tracks `main`), `main`, version tags such as `0.1.0` once released, and `sha-<commit>`.
+A multi-architecture image (linux/amd64 and linux/arm64, about 18 MB) is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. Tags: `latest` (tracks `main`), `main`, version tags such as `0.1.0` once released, and `sha-<commit>`.
 
 The package is private while the repository is private. Log in first with a GitHub token that has the `read:packages` scope.
 
