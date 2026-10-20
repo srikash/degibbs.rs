@@ -15,6 +15,7 @@ Gibbs-ringing removal for magnitude MRI, in pure Rust.
   - [Options](#options)
   - [BIDS sidecar](#bids-sidecar)
   - [MRtrix3 and FSL](#mrtrix3-and-fsl)
+- [Containers (Docker and Apptainer)](#containers-docker-and-apptainer)
 - [Choosing the partial-Fourier factor](#choosing-the-partial-fourier-factor)
 - [Validation on a Gibbs phantom](#validation-on-a-gibbs-phantom)
   - [Setup](#setup)
@@ -85,6 +86,34 @@ mrconvert dwi.mif dwi.nii.gz -json_export dwi.json -export_grad_fsl dwi.bvec dwi
 degibbs dwi.nii.gz dwi_degibbs.nii.gz
 mrconvert dwi_degibbs.nii.gz out.mif -fslgrad dwi.bvec dwi.bval
 ```
+
+## Containers (Docker and Apptainer)
+
+A linux/amd64 image (about 18 MB) is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. Tags: `latest` (tracks `main`), `main`, version tags such as `0.1.0` once released, and `sha-<commit>`.
+
+The package is private while the repository is private. Log in first with a GitHub token that has the `read:packages` scope.
+
+**Docker**
+
+```
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.rs \
+    in.nii.gz out.nii.gz --pe-axis j --pf 6/8
+```
+
+The container's working directory is `/data`, so relative paths resolve inside the mounted folder. Passing `-u` keeps the output files owned by you.
+
+**Apptainer (HPC)**
+
+```
+export APPTAINER_DOCKER_USERNAME=<github-user>
+export APPTAINER_DOCKER_PASSWORD=<token>
+apptainer pull degibbs.sif docker://ghcr.io/srikash/degibbs.rs:latest
+
+apptainer run degibbs.sif in.nii.gz out.nii.gz --pe-axis j --pf 6/8
+```
+
+Apptainer binds your current directory and home by default. Use `--bind` for other paths such as a project or scratch filesystem. The tool uses the CPUs your job is allowed to use, so set `--cpus-per-task` in Slurm, or pass `--threads N`.
 
 ## Choosing the partial-Fourier factor
 
