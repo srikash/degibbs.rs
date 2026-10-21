@@ -3,7 +3,7 @@
 use crate::fft::Engine;
 use anyhow::{Result, bail};
 use rustfft::num_complex::Complex64 as C;
-use std::f64::consts::PI;
+use std::{collections::HashMap, f64::consts::PI};
 
 /// Kernel parameters: `nshifts` = M (shifts `s = -M..=M`, step `1/(2M)` voxel),
 /// oscillation window `[min_w, max_w]`.
@@ -48,6 +48,38 @@ impl ShiftParams {
     }
 }
 
+/// Working memory of the 1D kernel, kept between calls so lines of the same length reuse it.
+#[derive(Default)]
+pub(crate) struct KernelScratch {
+    shifted: Vec<f64>,
+    absdiff: Vec<f64>,
+    spec: Vec<C>,
+    work: Vec<C>,
+    /// One absdiff row with `max_w + 1` wrapped samples on each side, so the window sums need no modulo.
+    ext: Vec<f64>,
+    best: Vec<f64>,
+    best_si: Vec<usize>,
+    /// `exp(2 pi i * freq * sigma_s / n)` for every shift and FFT index, per `(n, nshifts)`.
+    phases: HashMap<(usize, usize), Vec<C>>,
+}
+
+fn phase_table(n: usize, m: usize) -> Vec<C> {
+    let ns = 2 * m + 1;
+    let mut t = Vec::with_capacity(ns * n);
+    for si in 0..ns {
+        let sigma = (si as isize - m as isize) as f64 / (2 * m) as f64;
+        for j in 0..n {
+            let freq = if j <= (n - 1) / 2 {
+                j as f64
+            } else {
+                j as f64 - n as f64
+            };
+            t.push(C::from_polar(1.0, 2.0 * PI * freq * sigma / n as f64));
+        }
+    }
+    t
+}
+
 impl Engine {
     /// Remove Gibbs ringing from one real line: `out[x]` is the corrected value of `line[x]`.
     pub fn unring_line(&mut self, line: &[f64], out: &mut [f64], p: &ShiftParams) -> Result<()> {
@@ -63,14 +95,17 @@ impl Engine {
         }
         let m = p.nshifts;
         let ns = 2 * m + 1;
-        let mut shifted = std::mem::take(&mut self.shifted);
-        let mut absdiff = std::mem::take(&mut self.absdiff);
-        let mut spec = std::mem::take(&mut self.spec);
-        let mut work = std::mem::take(&mut self.work);
-        shifted.resize(ns * n, 0.0);
-        absdiff.resize(ns * n, 0.0);
-        spec.resize(n, C::new(0.0, 0.0));
-        work.resize(n, C::new(0.0, 0.0));
+        let mut k = std::mem::take(&mut self.kernel);
+        let table = k
+            .phases
+            .remove(&(n, m))
+            .unwrap_or_else(|| phase_table(n, m));
+        k.shifted.resize(ns * n, 0.0);
+        k.absdiff.resize(ns * n, 0.0);
+        k.spec.resize(n, C::new(0.0, 0.0));
+        k.work.resize(n, C::new(0.0, 0.0));
+        let mut spec = std::mem::take(&mut k.spec);
+        let mut work = std::mem::take(&mut k.work);
 
         for (c, &v) in spec.iter_mut().zip(line) {
             *c = C::new(v, 0.0);
@@ -80,23 +115,17 @@ impl Engine {
         let inv_n = 1.0 / n as f64;
         for si in 0..ns {
             let s = si as isize - m as isize;
-            let row = &mut shifted[si * n..(si + 1) * n];
+            let row = &mut k.shifted[si * n..(si + 1) * n];
             if s == 0 {
                 row.copy_from_slice(line);
                 continue;
             }
-            let sigma = s as f64 / (2 * m) as f64;
+            let phases = &table[si * n..(si + 1) * n];
             for (j, w) in work.iter_mut().enumerate() {
-                if n.is_multiple_of(2) && j == n / 2 {
-                    *w = C::new(0.0, 0.0); // Nyquist zeroed in shifted copies
-                    continue;
-                }
-                let freq = if j <= (n - 1) / 2 {
-                    j as f64
-                } else {
-                    j as f64 - n as f64
-                };
-                *w = spec[j] * C::from_polar(1.0, 2.0 * PI * freq * sigma / n as f64);
+                *w = spec[j] * phases[j];
+            }
+            if n.is_multiple_of(2) {
+                work[n / 2] = C::new(0.0, 0.0); // Nyquist zeroed in shifted copies
             }
             self.fft1(&mut work, true);
             for (r, w) in row.iter_mut().zip(work.iter()) {
@@ -104,34 +133,47 @@ impl Engine {
             }
         }
         for si in 0..ns {
-            let row = &shifted[si * n..(si + 1) * n];
-            let d = &mut absdiff[si * n..(si + 1) * n];
-            for j in 0..n {
-                d[j] = (row[j] - row[(j + 1) % n]).abs();
+            let row = &k.shifted[si * n..(si + 1) * n];
+            let d = &mut k.absdiff[si * n..(si + 1) * n];
+            for j in 0..n - 1 {
+                d[j] = (row[j] - row[j + 1]).abs();
             }
+            d[n - 1] = (row[n - 1] - row[0]).abs();
         }
 
-        for x in 0..n {
-            let mut best = f64::INFINITY;
-            let mut best_si = m; // s = 0
-            for si in 0..ns {
-                let d = &absdiff[si * n..(si + 1) * n];
+        // For every sample, the shift with the smallest oscillation on either side. Shifts are visited in
+        // ascending order and the plus side before the minus side, with strict `<`, so the first minimum wins.
+        let pad = p.max_w + 1;
+        k.ext.resize(n + 2 * pad, 0.0);
+        k.best.clear();
+        k.best.resize(n, f64::INFINITY);
+        k.best_si.clear();
+        k.best_si.resize(n, m); // s = 0
+        for si in 0..ns {
+            let d = &k.absdiff[si * n..(si + 1) * n];
+            k.ext[..pad].copy_from_slice(&d[n - pad..]);
+            k.ext[pad..pad + n].copy_from_slice(d);
+            k.ext[pad + n..].copy_from_slice(&d[..pad]);
+            for x in 0..n {
                 let (mut dp, mut dm) = (0.0, 0.0);
-                for k in p.min_w..=p.max_w {
-                    dp += d[(x + k) % n];
-                    dm += d[(x + n - k - 1) % n];
+                for kk in p.min_w..=p.max_w {
+                    dp += k.ext[pad + x + kk];
+                    dm += k.ext[pad + x - kk - 1];
                 }
-                if dp < best {
-                    best = dp;
-                    best_si = si;
+                if dp < k.best[x] {
+                    k.best[x] = dp;
+                    k.best_si[x] = si;
                 }
-                if dm < best {
-                    best = dm;
-                    best_si = si;
+                if dm < k.best[x] {
+                    k.best[x] = dm;
+                    k.best_si[x] = si;
                 }
             }
+        }
+        for x in 0..n {
+            let best_si = k.best_si[x];
             let s = best_si as isize - m as isize;
-            let row = &shifted[best_si * n..(best_si + 1) * n];
+            let row = &k.shifted[best_si * n..(best_si + 1) * n];
             out[x] = if s == 0 {
                 row[x]
             } else {
@@ -141,10 +183,10 @@ impl Engine {
             };
         }
 
-        self.shifted = shifted;
-        self.absdiff = absdiff;
-        self.spec = spec;
-        self.work = work;
+        k.spec = spec;
+        k.work = work;
+        k.phases.insert((n, m), table);
+        self.kernel = k;
         Ok(())
     }
 }

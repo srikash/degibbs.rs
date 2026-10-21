@@ -12,11 +12,8 @@ pub struct Engine {
     inv: HashMap<usize, Arc<dyn Fft<f64>>>,
     scratch: Vec<C>,
     column: Vec<C>,
-    /// Scratch owned by the 1D kernel (see `shift.rs`).
-    pub(crate) shifted: Vec<f64>,
-    pub(crate) absdiff: Vec<f64>,
-    pub(crate) spec: Vec<C>,
-    pub(crate) work: Vec<C>,
+    /// Working memory of the 1D kernel (see `shift.rs`).
+    pub(crate) kernel: crate::shift::KernelScratch,
 }
 
 impl Default for Engine {
@@ -33,10 +30,7 @@ impl Engine {
             inv: HashMap::new(),
             scratch: Vec::new(),
             column: Vec::new(),
-            shifted: Vec::new(),
-            absdiff: Vec::new(),
-            spec: Vec::new(),
-            work: Vec::new(),
+            kernel: Default::default(),
         }
     }
 
