@@ -1,5 +1,5 @@
 //! Gibbs-ringing removal by local subvoxel shifts, with partial-Fourier (RPG) support.
-//! See `SPEC.md` for the algorithm and the decisions taken where the papers are silent.
+//! The algorithm follows Kellner et al. (2016) and Lee et al. (2021); see `CITATION.bib`.
 
 pub mod config;
 pub mod fft;
