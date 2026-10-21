@@ -5,7 +5,7 @@ Gibbs-ringing removal for magnitude MRI, in pure Rust.
 - **Method:** local subvoxel shifts (Kellner et al., 2016), with the RPG extension for partial-Fourier acquisitions (Lee et al., 2021).
 - **Input and output:** NIfTI in, NIfTI out. Works with MRtrix3, FSL, ANTs or any other pipeline.
 - **Partial Fourier:** full Fourier, 7/8, 6/8 and 5/8.
-- **Binary:** one self-contained executable, no other dependencies.
+- **Binary:** one self-contained executable, no other dependencies. Also available as a Docker, Podman and Apptainer image.
 - **Licence:** non-commercial research only, not for clinical care.
 
 ## Contents
@@ -95,31 +95,60 @@ mrconvert dwi_degibbs.nii.gz out.mif -fslgrad dwi.bvec dwi.bval
 
 ## Containers (Docker and Apptainer)
 
-A multi-architecture image (linux/amd64 and linux/arm64, about 18 MB) is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. Tags: `latest` (tracks `main`), `main`, `0.1.5` (the current release), and `sha-<commit>`.
+The image is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. It is about 18 MB and runs on Intel/AMD and ARM (including Apple silicon) machines.
 
-The package is private while the repository is private. Log in first with a GitHub token that has the `read:packages` scope.
+- `latest` and `main` follow the newest commit.
+- `0.1.5` is the current release. Use a version tag in analysis scripts so the software stays fixed.
+- `sha-<commit>` pins an exact commit.
 
-**Docker**
+The package is private while the repository is private, so log in once with a GitHub token that has the `read:packages` scope. Create one under GitHub Settings, Developer settings, Personal access tokens (classic), or run `gh auth refresh -s read:packages` and use `$(gh auth token)`. Once the repository is public, no login is needed.
+
+The container's entry point is `degibbs`, so everything after the image name is a normal `degibbs` command. Its working directory is `/data`.
+
+### Docker (laptop or workstation)
 
 ```
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
-docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.rs \
-    in.nii.gz out.nii.gz --pe-axis j --pf 6/8
+docker run --rm ghcr.io/srikash/degibbs.rs:0.1.5 --version
+
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.rs:0.1.5 \
+    dwi.nii.gz dwi_degibbs.nii.gz --pe-axis j --pf 6/8
 ```
 
-The container's working directory is `/data`, so relative paths resolve inside the mounted folder. Passing `-u` keeps the output files owned by you.
+- `-v "$PWD":/data` makes the current folder visible inside the container, so file names are relative to it.
+- `-u` keeps the output files owned by you rather than root.
+- Podman works with the same image. Add `--userns=keep-id` instead of `-u`, and `:Z` after `/data` on SELinux systems such as Fedora and Rocky.
 
-**Apptainer (HPC)**
+### Apptainer (HPC)
+
+Pull the image once into a single `.sif` file, on a login or transfer node:
 
 ```
 export APPTAINER_DOCKER_USERNAME=<github-user>
 export APPTAINER_DOCKER_PASSWORD=<token>
-apptainer pull degibbs.sif docker://ghcr.io/srikash/degibbs.rs:latest
-
-apptainer run degibbs.sif in.nii.gz out.nii.gz --pe-axis j --pf 6/8
+apptainer pull degibbs_0.1.5.sif docker://ghcr.io/srikash/degibbs.rs:0.1.5
 ```
 
-Apptainer binds your current directory and home by default. Use `--bind` for other paths such as a project or scratch filesystem. The tool uses the CPUs your job is allowed to use, so set `--cpus-per-task` in Slurm, or pass `--threads N`.
+Then run it like any other program. Apptainer shares your user ID, so output files are yours.
+
+```
+apptainer run degibbs_0.1.5.sif dwi.nii.gz dwi_degibbs.nii.gz --pe-axis j --pf 6/8
+```
+
+- Apptainer makes your home and current folder visible by default. Add `--bind /path/to/study:/data` for a project or scratch filesystem, and give absolute paths inside the container.
+- A Slurm job, with the thread count matched to the CPUs you asked for:
+
+```
+#!/bin/bash
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16G
+#SBATCH --time=01:00:00
+
+apptainer run --bind /scratch/$USER/study:/data degibbs_0.1.5.sif \
+    /data/sub-01/dwi.nii.gz /data/sub-01/dwi_degibbs.nii.gz --threads "$SLURM_CPUS_PER_TASK"
+```
+
+- Older clusters call the program `singularity`. The commands are the same, with `SINGULARITY_DOCKER_USERNAME` and `SINGULARITY_DOCKER_PASSWORD` for the login.
 
 ## Choosing the partial-Fourier factor
 
