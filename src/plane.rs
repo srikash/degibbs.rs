@@ -32,6 +32,24 @@ impl Plane {
     }
 }
 
+/// Complex counterpart of [`Plane`], same layout: `data[y * nx + x]`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CPlane {
+    pub data: Vec<C>,
+    pub nx: usize,
+    pub ny: usize,
+}
+
+impl CPlane {
+    pub fn new(nx: usize, ny: usize) -> Self {
+        Self {
+            data: vec![C::new(0.0, 0.0); nx * ny],
+            nx,
+            ny,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Axis {
     X,
@@ -95,8 +113,8 @@ impl Engine {
     }
 
     /// `IFT[spec * G]` with `Gx` (for `Axis::X`) or `Gy` (for `Axis::Y`) of SPEC section 3,
-    /// where `spec` comes from [`Engine::spectrum`] for an `ny x nx` plane.
-    fn weighted(&mut self, spec: &[C], ny: usize, nx: usize, which: Axis) -> Plane {
+    /// where `spec` comes from [`Engine::spectrum`] for an `ny x nx` plane. Keeps the imaginary part.
+    fn weighted_complex(&mut self, spec: &[C], ny: usize, nx: usize, which: Axis) -> Vec<C> {
         let cx: Vec<f64> = (0..nx).map(|m| one_plus_cos(m, nx)).collect();
         let cy: Vec<f64> = (0..ny).map(|m| one_plus_cos(m, ny)).collect();
         let mut buf = spec.to_vec();
@@ -115,6 +133,12 @@ impl Engine {
             }
         }
         self.fft2(&mut buf, ny, nx, true);
+        buf
+    }
+
+    /// Real part of [`Engine::weighted_complex`], for real input.
+    fn weighted(&mut self, spec: &[C], ny: usize, nx: usize, which: Axis) -> Plane {
+        let buf = self.weighted_complex(spec, ny, nx, which);
         Plane {
             data: buf.iter().map(|c| c.re).collect(),
             nx,
@@ -145,6 +169,66 @@ impl Engine {
         self.unring_axis(&mut jx, Axis::X, p)?;
         self.unring_axis(&mut jy, Axis::Y, p)?;
         plane.assign_sum(&jx, &jy);
+        Ok(())
+    }
+
+    /// 1D-unring every line of a complex plane along `axis`.
+    pub fn unring_axis_complex(
+        &mut self,
+        plane: &mut CPlane,
+        axis: Axis,
+        p: &ShiftParams,
+    ) -> Result<()> {
+        let (nx, ny) = (plane.nx, plane.ny);
+        let len = match axis {
+            Axis::X => nx,
+            Axis::Y => ny,
+        };
+        let (mut re, mut im) = (vec![0.0; len], vec![0.0; len]);
+        let (mut out_re, mut out_im) = (vec![0.0; len], vec![0.0; len]);
+        let lines = match axis {
+            Axis::X => ny,
+            Axis::Y => nx,
+        };
+        for l in 0..lines {
+            let at = |i: usize| match axis {
+                Axis::X => l * nx + i,
+                Axis::Y => i * nx + l,
+            };
+            for i in 0..len {
+                let v = plane.data[at(i)];
+                (re[i], im[i]) = (v.re, v.im);
+            }
+            self.unring_line_complex(&re, &im, &mut out_re, &mut out_im, p)?;
+            for i in 0..len {
+                plane.data[at(i)] = C::new(out_re[i], out_im[i]);
+            }
+        }
+        Ok(())
+    }
+
+    /// Complex counterpart of [`Engine::sushi`]: the x/y weighting is linear, so it keeps both parts.
+    pub fn sushi_complex(&mut self, plane: &mut CPlane, p: &ShiftParams) -> Result<()> {
+        let (nx, ny) = (plane.nx, plane.ny);
+        let mut spec = plane.data.clone();
+        self.fft2(&mut spec, ny, nx, false);
+        let ix = self.weighted_complex(&spec, ny, nx, Axis::X);
+        let mut jx = CPlane { data: ix, nx, ny };
+        let mut jy = CPlane {
+            data: plane
+                .data
+                .iter()
+                .zip(&jx.data)
+                .map(|(i, x)| i - x)
+                .collect(),
+            nx,
+            ny,
+        };
+        self.unring_axis_complex(&mut jx, Axis::X, p)?;
+        self.unring_axis_complex(&mut jy, Axis::Y, p)?;
+        for ((o, x), y) in plane.data.iter_mut().zip(&jx.data).zip(&jy.data) {
+            *o = x + y;
+        }
         Ok(())
     }
 }

@@ -2,7 +2,7 @@
 
 use crate::{
     fft::Engine,
-    plane::{Axis, Plane},
+    plane::{Axis, CPlane, Plane},
     shift::ShiftParams,
 };
 use anyhow::{Result, bail};
@@ -111,5 +111,22 @@ impl Engine {
                 self.unring_axis(plane, Axis::Y, p)
             }
         }
+    }
+
+    /// Correct one complex plane as full-Fourier data (see [`crate::degibbs_complex`]).
+    pub fn rpg_plane_complex(&mut self, plane: &mut CPlane, p: &ShiftParams) -> Result<()> {
+        p.validate()?;
+        let (nx, ny) = (plane.nx, plane.ny);
+        if let Some(&bad) = Pf::Full
+            .line_lengths(nx, ny)
+            .iter()
+            .find(|&&l| l < p.min_len())
+        {
+            bail!(
+                "plane {nx}x{ny} is too small: a line of length {bad} is shorter than {}",
+                p.min_len()
+            );
+        }
+        self.sushi_complex(plane, p)
     }
 }

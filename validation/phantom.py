@@ -121,6 +121,90 @@ def evaluate(a, exe, out, offsets, side, phase, snr, seeds, n, r):
     return {m: np.array(v) for m, v in res.items()}
 
 
+def run_complex(exe, out, z, tag):
+    inp, res = f'{out}/{tag}.nii.gz', f'{out}/{tag}_c.nii.gz'
+    nib.save(nib.Nifti1Image(np.repeat(z.T[:, :, None], 4, 2).astype(np.complex64), np.eye(4)), inp)
+    subprocess.run([exe, inp, res, '--pe-axis', 'j', '--no-json'], check=True, capture_output=True)
+    return np.asanyarray(nib.load(res).dataobj)[:, :, 0].T
+
+
+def evaluate_complex(exe, out, offsets, phase, snr, seeds, n, r):
+    """Full-Fourier data (complex images are treated as POCS-reconstructed): magnitude path against complex path."""
+    metrics = ['far_brain', 'far_background', 'near_brain', 'skull', 'whole_brain', 'whole_all']
+    res = {m: [] for m in metrics}
+    for oi, off in enumerate(offsets):
+        st = Setup(n, r, off, phase)
+        for seed in seeds:
+            rng = np.random.default_rng(1000 * oi + seed)
+            k = st.k
+            if snr:
+                sk = BRAIN / snr * n
+                k = k + (rng.normal(size=k.shape) + 1j * rng.normal(size=k.shape)) * sk
+            z = np.fft.ifft2(np.fft.ifftshift(k))
+            outs = [np.abs(z), run(exe, out, np.abs(z), 1, 'cx_m'), np.abs(run_complex(exe, out, z, 'cx_c'))]
+            res_run = {m: [np.sqrt(np.mean((o - st.truth)[st.mask[m]] ** 2)) for o in outs] for m in metrics}
+            for m in metrics:
+                res[m].append(res_run[m])
+    return {m: np.array(v) for m, v in res.items()}
+
+
+def pocs(k_zf, keep, iterations=15):
+    """Basic POCS for one-sided partial Fourier along y: phase from the symmetric central lines, then repeat
+    (take the magnitude of the estimate with that phase, transform, put the measured lines back)."""
+    n = k_zf.shape[0]
+    c = n // 2
+    half = keep - 1 - c            # the lines -half..half around the centre are sampled on both sides
+    low = np.zeros_like(k_zf)
+    low[c - half:c + half + 1] = k_zf[c - half:c + half + 1]
+    ph = np.exp(1j * np.angle(np.fft.ifft2(np.fft.ifftshift(low))))
+    measured = np.zeros(n, bool)
+    measured[:keep] = True
+    x = np.fft.ifft2(np.fft.ifftshift(k_zf))
+    for _ in range(iterations):
+        kk = np.fft.fftshift(np.fft.fft2(np.abs(x) * ph))
+        kk[measured] = k_zf[measured]
+        x = np.fft.ifft2(np.fft.ifftshift(kk))
+    return x
+
+
+def evaluate_pocs(exe, out, offsets, phase, n, r):
+    """Routes for zero-filled partial-Fourier data, against no correction."""
+    metrics = ['far_brain', 'far_background', 'near_brain', 'skull', 'whole_all']
+    routes = ['none', 'zero-filled magnitude, matching --pf', 'zero-filled complex, complex path',
+              'POCS complex, complex path', 'POCS magnitude, --pf 1']
+    res = {}
+    for pf in PFS[1:]:
+        keep = int(round(pf * n))
+        acc = {m: [] for m in metrics}
+        for off in offsets:
+            st = Setup(n, r, off, phase)
+            k = st.k.copy()
+            k[keep:] = 0
+            zf = np.fft.ifft2(np.fft.ifftshift(k))
+            po = pocs(k, keep)
+            outs = [np.abs(zf), run(exe, out, np.abs(zf), pf, 'po_a'), np.abs(run_complex(exe, out, zf, 'po_b')),
+                    np.abs(run_complex(exe, out, po, 'po_c')), run(exe, out, np.abs(po), 1, 'po_d')]
+            for m in metrics:
+                acc[m].append([np.sqrt(np.mean((o - st.truth)[st.mask[m]] ** 2)) for o in outs])
+        res[pf] = ({m: np.array(v).mean(0) for m, v in acc.items()}, routes)
+    return res
+
+
+def show_pocs(res, title):
+    print(f'\n== {title} ==')
+    for pf, (v, routes) in res.items():
+        print(f'-- acquired {NAMES[PFS.index(pf)]}: RMSE by region (columns: ' + ', '.join(routes) + ')')
+        for m, row in v.items():
+            print(f'   {m:>15}', ' '.join(f'{x:7.3f}' for x in row))
+
+
+def show_complex(res, title):
+    print(f'\n== {title} ==')
+    print('far-field and whole-image RMSE: none, magnitude path (--pf 1), complex path')
+    for m, v in res.items():
+        print(f'   {m:>15}', ' '.join(f'{x:7.3f}' for x in v.mean(0)))
+
+
 def show(res, title, counts):
     print(f'\n== {title} ==')
     print('pixels per mask (offset 0):', {m: int(c) for m, c in counts.items()})
@@ -179,6 +263,8 @@ def main():
     p.add_argument('--side', choices=['hi', 'lo'], default='hi', help='which end of k-space is left unsampled')
     p.add_argument('--snr', type=float, default=None, help='brain intensity divided by the noise sigma of each complex channel')
     p.add_argument('--seeds', type=int, default=1)
+    p.add_argument('--complex', action='store_true', help='compare the magnitude and complex paths on full-Fourier data')
+    p.add_argument('--pocs', action='store_true', help='compare routes for zero-filled partial-Fourier data, including a basic POCS reconstruction')
     p.add_argument('--figures', help='directory to write qc_images.png and qc_profiles.png (offset 0, noise-free)')
     p.add_argument('--json', help='write the mean tables to this file')
     a = p.parse_args()
@@ -186,6 +272,13 @@ def main():
     if a.figures:
         os.makedirs(a.figures, exist_ok=True)
     offsets = [(k, (3 * k) % a.r) for k in range(a.offsets)] if a.offsets > 1 else [(0, 0)]
+    if a.pocs:
+        show_pocs(evaluate_pocs(a.exe, a.out, offsets, a.phase, a.n, a.r), f'POCS routes: phase={a.phase} offsets={len(offsets)}')
+        return
+    if a.complex:
+        res = evaluate_complex(a.exe, a.out, offsets, a.phase, a.snr, range(a.seeds), a.n, a.r)
+        show_complex(res, f'complex: phase={a.phase} snr={a.snr} offsets={len(offsets)} seeds={a.seeds}')
+        return
     res = evaluate(a, a.exe, a.out, offsets, a.side, a.phase, a.snr, range(a.seeds), a.n, a.r)
     counts = {m: v.sum() for m, v in Setup(a.n, a.r, 0, a.phase).mask.items()}
     show(res, f'phase={a.phase} side={a.side} snr={a.snr} offsets={len(offsets)} seeds={a.seeds}', counts)

@@ -41,6 +41,7 @@ fn write_header() -> NiftiHeader {
 fn save(path: &Path, data: ArrayD<f32>) {
     let img = io::Image {
         data,
+        imag: None,
         header: write_header(),
         extensions: None,
     };

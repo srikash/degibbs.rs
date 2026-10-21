@@ -1,4 +1,5 @@
-//! Thin adapter over the `nifti` crate: read to `f32`, write back reusing the input header.
+//! Thin adapter over the `nifti` crate: read to `f32` (complex files as real and imaginary parts), write back
+//! reusing the input header.
 
 use anyhow::{Context, Result};
 use ndarray::ArrayD;
@@ -6,10 +7,14 @@ use nifti::{
     IntoNdArray, NiftiHeader, NiftiObject, ReaderOptions, extension::ExtensionSequence,
     writer::WriterOptions,
 };
+use rustfft::num_complex::{Complex32, Complex64};
 use std::path::Path;
 
 pub struct Image {
+    /// Real data, or the real part of a complex image.
     pub data: ArrayD<f32>,
+    /// Imaginary part of a complex image.
+    pub imag: Option<ArrayD<f32>>,
     pub header: NiftiHeader,
     /// Header extensions of the source file, if it had any (carried over on write).
     pub extensions: Option<ExtensionSequence>,
@@ -22,25 +27,51 @@ pub fn read(path: &Path) -> Result<Image> {
         .with_context(|| format!("reading {}", path.display()))?;
     let header = obj.header().clone();
     // NIfTI codes: 32 complex64, 128 RGB24, 1792 complex128, 2048 complex256, 2304 RGBA32.
-    if matches!(header.datatype, 32 | 128 | 1792 | 2048 | 2304) {
+    if matches!(header.datatype, 128 | 2048 | 2304) {
         anyhow::bail!(
-            "{}: complex and RGB images are not supported (magnitude data only)",
+            "{}: RGB and 256-bit complex images are not supported",
+            path.display()
+        );
+    }
+    let is_complex = matches!(header.datatype, 32 | 1792);
+    if is_complex && header.scl_slope != 0.0 && (header.scl_slope != 1.0 || header.scl_inter != 0.0)
+    {
+        anyhow::bail!(
+            "{}: complex images with scl_slope/scl_inter scaling are not supported",
             path.display()
         );
     }
     let extensions = Some(obj.extensions().clone()).filter(|e| !e.is_empty());
-    let data = obj
-        .into_volume()
-        .into_ndarray::<f32>()
-        .with_context(|| format!("decoding {}", path.display()))?;
+    let decode = |e: nifti::NiftiError| anyhow::anyhow!("decoding {}: {e}", path.display());
+    let (data, imag) = match header.datatype {
+        32 => {
+            let c = obj
+                .into_volume()
+                .into_ndarray::<Complex32>()
+                .map_err(decode)?;
+            (c.mapv(|v| v.re), Some(c.mapv(|v| v.im)))
+        }
+        1792 => {
+            let c = obj
+                .into_volume()
+                .into_ndarray::<Complex64>()
+                .map_err(decode)?;
+            (c.mapv(|v| v.re as f32), Some(c.mapv(|v| v.im as f32)))
+        }
+        _ => (
+            obj.into_volume().into_ndarray::<f32>().map_err(decode)?,
+            None,
+        ),
+    };
     Ok(Image {
         data,
+        imag,
         header,
         extensions,
     })
 }
 
-/// Write float32 data with the geometry of `header`; `.gz` extension compresses.
+/// Write float32 data (complex64 if `imag` is set) with the geometry of `header`; `.gz` extension compresses.
 pub fn write(path: &Path, img: &Image) -> Result<()> {
     let name = path.to_string_lossy();
     if !(name.ends_with(".nii") || name.ends_with(".nii.gz")) {
@@ -60,6 +91,14 @@ pub fn write(path: &Path, img: &Image) -> Result<()> {
     if let Some(ext) = &img.extensions {
         opts = opts.with_extensions(ext.clone());
     }
-    opts.write_nifti(&img.data)
-        .with_context(|| format!("writing {}", path.display()))
+    match &img.imag {
+        None => opts.write_nifti(&img.data),
+        Some(im) => {
+            let z = ndarray::Zip::from(&img.data)
+                .and(im)
+                .map_collect(|&r, &i| Complex32::new(r, i));
+            opts.write_nifti(&z)
+        }
+    }
+    .with_context(|| format!("writing {}", path.display()))
 }
