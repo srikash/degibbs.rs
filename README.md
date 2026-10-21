@@ -1,6 +1,6 @@
 # degibbs.rs
 
-Gibbs-ringing removal for MRI, in pure Rust.
+Gibbs-ringing removal for MRI in pure Rust (assisted in no small part by Claude 5.5).
 
 - **Method:** local subvoxel shifts (Kellner et al., 2016), with the RPG extension for partial-Fourier acquisitions (Lee et al., 2021).
 - **Input and output:** NIfTI in, NIfTI out. Works with MRtrix3, FSL, ANTs or any other pipeline.
