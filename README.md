@@ -27,7 +27,7 @@ Gibbs-ringing removal for magnitude MRI, in pure Rust.
 
 ## Quick start
 
-Download the static Linux binary (x86-64) from the [v0.1.5 release](https://github.com/srikash/degibbs.rs/releases/tag/v0.1.5). It runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, and Fedora 44. Use `gh release download v0.1.5 -R srikash/degibbs.rs` while the repository is private.
+Download the static Linux binary (x86-64) from the [v0.1.5 release](https://github.com/srikash/degibbs.rs/releases/tag/v0.1.5). It runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, and Fedora 44.
 
 ```
 tar xzf degibbs-v0.1.5-x86_64-linux-musl.tar.gz
@@ -101,14 +101,11 @@ The image is published to the GitHub Container Registry as `ghcr.io/srikash/degi
 - `0.1.5` is the current release. Use a version tag in analysis scripts so the software stays fixed.
 - `sha-<commit>` pins an exact commit.
 
-The package is private while the repository is private, so log in once with a GitHub token that has the `read:packages` scope. Create one under GitHub Settings, Developer settings, Personal access tokens (classic), or run `gh auth refresh -s read:packages` and use `$(gh auth token)`. Once the repository is public, no login is needed.
-
 The container's entry point is `degibbs`, so everything after the image name is a normal `degibbs` command. Its working directory is `/data`.
 
 ### Docker (laptop or workstation)
 
 ```
-echo "$GITHUB_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
 docker run --rm ghcr.io/srikash/degibbs.rs:0.1.5 --version
 
 docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.rs:0.1.5 \
@@ -124,8 +121,6 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.r
 Pull the image once into a single `.sif` file, on a login or transfer node:
 
 ```
-export APPTAINER_DOCKER_USERNAME=<github-user>
-export APPTAINER_DOCKER_PASSWORD=<token>
 apptainer pull degibbs_0.1.5.sif docker://ghcr.io/srikash/degibbs.rs:0.1.5
 ```
 
@@ -148,7 +143,7 @@ apptainer run --bind /scratch/$USER/study:/data degibbs_0.1.5.sif \
     /data/sub-01/dwi.nii.gz /data/sub-01/dwi_degibbs.nii.gz --threads "$SLURM_CPUS_PER_TASK"
 ```
 
-- Older clusters call the program `singularity`. The commands are the same, with `SINGULARITY_DOCKER_USERNAME` and `SINGULARITY_DOCKER_PASSWORD` for the login.
+- Older clusters call the program `singularity`. The commands are the same.
 
 ## Choosing the partial-Fourier factor
 
