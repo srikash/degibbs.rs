@@ -12,6 +12,6 @@ LABEL org.opencontainers.image.title="degibbs" \
       org.opencontainers.image.source="https://github.com/srikash/degibbs.rs" \
       org.opencontainers.image.licenses="LicenseRef-NYU-Non-Commercial-Research"
 COPY --from=build /src/target/release/degibbs /usr/local/bin/degibbs
-COPY LICENSE /licenses/degibbs.rs-LICENSE
+COPY LICENCE /licenses/degibbs.rs-LICENCE
 WORKDIR /data
 ENTRYPOINT ["degibbs"]

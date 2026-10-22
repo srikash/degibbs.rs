@@ -184,7 +184,7 @@ degibbs mag.nii.gz out_mag.nii.gz --phase phase.nii.gz --phase-out out_phase.nii
 
 ## Licence and citing
 
-**Licence.** The NYU Non-Commercial Research License, copied unchanged from [NYU-DiffusionMRI/rpg-degibbs](https://github.com/NYU-DiffusionMRI/rpg-degibbs) (see `LICENSE`). Non-commercial research only, not for clinical care, no patent rights granted.
+**Licence.** The NYU Non-Commercial Research License, copied unchanged from [NYU-DiffusionMRI/rpg-degibbs](https://github.com/NYU-DiffusionMRI/rpg-degibbs) (see `LICENCE`). Non-commercial research only, not for clinical care, no patent rights granted.
 
 **Required citation.** Clause 6 of the licence requires any publication of research that involves this software to cite:
 

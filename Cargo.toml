@@ -2,7 +2,7 @@
 name = "degibbs"
 version = "0.1.6"
 edition = "2024"
-license-file = "LICENSE"
+license-file = "LICENCE"
 
 [dependencies]
 anyhow = "1.0.104"
