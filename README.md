@@ -11,10 +11,10 @@ Gibbs-ringing removal for MRI in pure Rust (assisted in no small part by Claude 
 
 ## Install
 
-Download the static Linux binary (x86-64) from the [v0.1.6 release](https://github.com/srikash/degibbs.rs/releases/tag/v0.1.6). It runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, and Fedora 44.
+Download the static Linux binary (x86-64) from the [v0.2.1 release](https://github.com/srikash/degibbs.rs/releases/tag/v0.2.1). It runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, and Fedora 44.
 
 ```
-tar xzf degibbs-v0.1.6-x86_64-linux-musl.tar.gz
+tar xzf degibbs-v0.2.1-x86_64-linux-musl.tar.gz
 ```
 
 Or build from source (needs Rust 1.85 or newer; this puts `degibbs` on your `PATH`):
