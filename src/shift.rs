@@ -1,4 +1,4 @@
-//! 1D local subvoxel-shift kernel (SPEC section 2).
+//! 1D local subvoxel-shift kernel (Kellner 2016, "One-Dimensional Case").
 
 use crate::fft::Engine;
 use anyhow::{Result, bail};
@@ -42,7 +42,7 @@ impl ShiftParams {
         Ok(())
     }
 
-    /// Shortest line the kernel accepts (SPEC: `N > k2 + 2`).
+    /// Shortest line the kernel accepts (the window must not wrap onto itself: `N > maxw + 2`).
     pub fn min_len(&self) -> usize {
         self.max_w + 3
     }
