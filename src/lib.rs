@@ -67,6 +67,12 @@ fn prepare(vols: &mut [&mut ArrayD<f32>], p: &Params) -> Result<Layout> {
             p.other_axis
         );
     }
+    if vols[0].shape()[p.pe_axis] == 0 || vols[0].shape()[p.other_axis] == 0 {
+        bail!(
+            "the plane axes must not be empty (shape {:?})",
+            vols[0].shape()
+        );
+    }
     p.shift.validate()?;
     // Every array is indexed with the strides of the first, so all must share one memory layout.
     let same_layout = vols.iter().all(|v| v.strides() == vols[0].strides());

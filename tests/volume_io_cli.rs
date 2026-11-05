@@ -94,6 +94,14 @@ fn pe_along_the_third_axis_works() {
 }
 
 #[test]
+fn an_empty_plane_axis_is_an_error_not_a_panic() {
+    for shape in [[0, 16], [16, 0]] {
+        let mut v = ArrayD::<f32>::zeros(IxDyn(&shape));
+        assert!(degibbs(&mut v, &params(Pf::Full, 1, 0)).is_err());
+    }
+}
+
+#[test]
 fn invalid_axes_are_rejected() {
     let (mut v, _) = volume(24, 24, 1, 1, 1.0);
     assert!(degibbs(&mut v, &params(Pf::Full, 1, 1)).is_err());
