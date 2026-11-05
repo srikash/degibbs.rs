@@ -107,7 +107,8 @@ pub fn degibbs(vol: &mut ArrayD<f32>, p: &Params) -> Result<()> {
         .as_slice_memory_order_mut()
         .expect("made contiguous above");
     let per_chunk = (PLANE_BUDGET_BYTES / (nx * ny * 8))
-        .clamp(rayon::current_num_threads(), MAX_PLANES_PER_CHUNK);
+        .min(MAX_PLANES_PER_CHUNK)
+        .max(rayon::current_num_threads()); // at least one plane per thread, even above the cap
     for chunk in bases.chunks(per_chunk) {
         let mut planes: Vec<Plane> = chunk
             .iter()
@@ -168,7 +169,8 @@ pub fn degibbs_complex(re: &mut ArrayD<f32>, im: &mut ArrayD<f32>, p: &Params) -
         .as_slice_memory_order_mut()
         .expect("made contiguous above");
     let per_chunk = (PLANE_BUDGET_BYTES / (nx * ny * 16))
-        .clamp(rayon::current_num_threads(), MAX_PLANES_PER_CHUNK);
+        .min(MAX_PLANES_PER_CHUNK)
+        .max(rayon::current_num_threads()); // at least one plane per thread, even above the cap
     for chunk in bases.chunks(per_chunk) {
         let mut planes: Vec<CPlane> = chunk
             .iter()

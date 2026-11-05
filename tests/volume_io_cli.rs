@@ -193,6 +193,20 @@ fn cli_without_any_pe_information_fails_clearly() {
 }
 
 #[test]
+fn more_threads_than_the_plane_cap_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let (v, _) = volume(24, 24, 1, 1, 1.0);
+    let input = dir.path().join("a.nii");
+    save(&input, v);
+    cli()
+        .arg(&input)
+        .arg(dir.path().join("o.nii"))
+        .args(["--pe-axis", "j", "--pf", "1", "--threads", "600"])
+        .assert()
+        .success();
+}
+
+#[test]
 fn cli_rejects_unsupported_pf() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(24, 24, 1, 1, 1.0);
