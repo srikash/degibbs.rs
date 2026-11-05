@@ -29,7 +29,7 @@ pub struct Params {
     pub other_axis: usize,
 }
 
-/// Upper bound on planes held (as f64) at once; chunks are also capped by `PLANE_BUDGET_BYTES`.
+/// Cap on planes per chunk. `PLANE_BUDGET_BYTES` may lower it and the thread count may raise it.
 const MAX_PLANES_PER_CHUNK: usize = 512;
 const PLANE_BUDGET_BYTES: usize = 256 << 20;
 

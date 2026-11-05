@@ -1,5 +1,6 @@
 //! Test phantoms: a high-resolution analytic-geometry image is truncated in k-space to make
 //! exactly Gibbs-corrupted low-resolution data, and block-averaged to make the ground truth.
+//! Also the NIfTI and CLI fixtures that the integration tests share.
 #![allow(dead_code)]
 
 use assert_cmd::Command;
@@ -297,7 +298,7 @@ pub fn centroid_y(a: &Plane) -> f64 {
     s / w
 }
 
-/// Fraction of ky that is missing for an acquired partial-Fourier mode: `2 * pf - 1`.
+/// `2 * pf - 1` of the acquired mode, the `nu` that `corrupted_and_truth` expects.
 pub fn nu(pf: Pf) -> f64 {
     match pf {
         Pf::Full => 1.0,
