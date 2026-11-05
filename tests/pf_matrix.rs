@@ -1,6 +1,6 @@
 //! Acquired-PF x correction-PF matrix on the Shepp-Logan phantom: which `--pf` setting works on which data.
 //! Run with `--nocapture` to print the table. The metric is the RMSE over flat tissue pixels (truth above 10, flat
-//! 11 x 11 window), so it is not the same as the README's brain mask and its numbers differ slightly.
+//! 11 x 11 window), so it is not the same as the brain mask in `docs/validation.md` and its numbers differ slightly.
 mod common;
 
 use common::*;
