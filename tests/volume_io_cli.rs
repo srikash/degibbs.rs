@@ -1,12 +1,9 @@
 mod common;
 
 use approx::assert_abs_diff_eq;
-use assert_cmd::Command;
-use common::corrupted_and_truth;
+use common::{cli, corrupted_and_truth, header, save};
 use degibbs::{Params, Pf, ShiftParams, degibbs, fft::Engine, io, plane::Plane};
 use ndarray::{ArrayD, IxDyn, ShapeBuilder};
-use nifti::NiftiHeader;
-use std::path::Path;
 
 fn params(pf: Pf, pe: usize, other: usize) -> Params {
     Params {
@@ -27,39 +24,18 @@ fn volume(nx: usize, ny: usize, nz: usize, nt: usize, nu: f64) -> (ArrayD<f32>, 
     (v, plane)
 }
 
-fn write_header() -> NiftiHeader {
-    NiftiHeader {
-        pixdim: [1.0, 2.0, 2.5, 3.0, 1.0, 0.0, 0.0, 0.0],
-        sform_code: 1,
-        srow_x: [2.0, 0.0, 0.0, -10.0],
-        srow_y: [0.0, 2.5, 0.0, -20.0],
-        srow_z: [0.0, 0.0, 3.0, -30.0],
-        ..Default::default()
-    }
-}
-
-fn save(path: &Path, data: ArrayD<f32>) {
-    let img = io::Image {
-        data,
-        imag: None,
-        header: write_header(),
-        extensions: None,
-    };
-    io::write(path, &img).unwrap();
-}
-
 #[test]
 fn nifti_roundtrip_keeps_data_and_geometry_for_nii_and_gz() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(24, 20, 3, 2, 1.0);
     for name in ["a.nii", "a.nii.gz"] {
         let path = dir.path().join(name);
-        save(&path, v.clone());
+        save(&path, v.clone(), None);
         let back = io::read(&path).unwrap();
         assert_eq!(back.data.shape(), v.shape());
         assert_eq!(back.data, v);
-        assert_eq!(back.header.pixdim, write_header().pixdim);
-        assert_eq!(back.header.srow_x, write_header().srow_x);
+        assert_eq!(back.header.pixdim, header().pixdim);
+        assert_eq!(back.header.srow_x, header().srow_x);
         assert_eq!(back.header.datatype, 16); // float32
     }
 }
@@ -124,16 +100,12 @@ fn invalid_axes_are_rejected() {
     assert!(degibbs(&mut v, &params(Pf::Full, 7, 0)).is_err());
 }
 
-fn cli() -> Command {
-    Command::cargo_bin("degibbs").unwrap()
-}
-
 #[test]
 fn cli_reads_pe_and_pf_from_the_sidecar() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(40, 36, 2, 2, 0.75);
     let input = dir.path().join("dwi.nii.gz");
-    save(&input, v.clone());
+    save(&input, v.clone(), None);
     std::fs::write(
         dir.path().join("dwi.json"),
         r#"{"PhaseEncodingDirection":"j-","PartialFourier":0.75}"#,
@@ -145,7 +117,7 @@ fn cli_reads_pe_and_pf_from_the_sidecar() {
     let mut want = v;
     degibbs(&mut want, &params(Pf::P68, 1, 0)).unwrap();
     let got = io::read(&output).unwrap();
-    assert_eq!(got.header.pixdim, write_header().pixdim);
+    assert_eq!(got.header.pixdim, header().pixdim);
     for (a, b) in got.data.iter().zip(want.iter()) {
         assert_abs_diff_eq!(a, b, epsilon = 1e-5);
     }
@@ -156,7 +128,7 @@ fn cli_flags_override_the_sidecar_and_missing_pf_prints_a_notice() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(36, 40, 1, 1, 1.0);
     let input = dir.path().join("a.nii");
-    save(&input, v.clone());
+    save(&input, v.clone(), None);
     std::fs::write(
         dir.path().join("a.json"),
         r#"{"PhaseEncodingDirection":"i"}"#,
@@ -183,7 +155,7 @@ fn cli_without_any_pe_information_fails_clearly() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(24, 24, 1, 1, 1.0);
     let input = dir.path().join("a.nii");
-    save(&input, v);
+    save(&input, v, None);
     let out = cli()
         .arg(&input)
         .arg(dir.path().join("o.nii"))
@@ -197,7 +169,7 @@ fn more_threads_than_the_plane_cap_does_not_panic() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(24, 24, 1, 1, 1.0);
     let input = dir.path().join("a.nii");
-    save(&input, v);
+    save(&input, v, None);
     cli()
         .arg(&input)
         .arg(dir.path().join("o.nii"))
@@ -211,7 +183,7 @@ fn cli_rejects_unsupported_pf() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(24, 24, 1, 1, 1.0);
     let input = dir.path().join("a.nii");
-    save(&input, v);
+    save(&input, v, None);
     cli()
         .arg(&input)
         .arg(dir.path().join("o.nii"))
@@ -236,7 +208,7 @@ fn cli_ignores_a_malformed_auto_sidecar_when_flags_suffice_and_rejects_bad_outpu
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(24, 24, 1, 1, 1.0);
     let input = dir.path().join("a.nii");
-    save(&input, v);
+    save(&input, v, None);
     std::fs::write(dir.path().join("a.json"), r#"{"PartialFourier":"6/8"}"#).unwrap();
     cli()
         .arg(&input)
