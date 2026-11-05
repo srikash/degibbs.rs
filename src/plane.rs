@@ -1,4 +1,4 @@
-//! 2D plane operations (SPEC sections 2-3): axis-wise unringing and the full-Fourier "SuShi" pipeline.
+//! 2D plane operations (Kellner 2016, eq. 4-5 and Fig. 3): axis-wise unringing and the full-Fourier "SuShi" pipeline.
 //! Plane layout is row-major with y (the phase-encoding axis) as the slow axis: `data[y * nx + x]`.
 
 use crate::{fft::Engine, shift::ShiftParams};
@@ -21,9 +21,7 @@ impl Plane {
             ny,
         }
     }
-}
 
-impl Plane {
     /// `self = a + b` (same dimensions).
     pub fn assign_sum(&mut self, a: &Plane, b: &Plane) {
         for ((o, x), y) in self.data.iter_mut().zip(&a.data).zip(&b.data) {
@@ -112,7 +110,7 @@ impl Engine {
         buf
     }
 
-    /// `IFT[spec * G]` with `Gx` (for `Axis::X`) or `Gy` (for `Axis::Y`) of SPEC section 3,
+    /// `IFT[spec * G]` with `Gx` (for `Axis::X`) or `Gy` (for `Axis::Y`) of Kellner 2016, eq. 4-5,
     /// where `spec` comes from [`Engine::spectrum`] for an `ny x nx` plane. Keeps the imaginary part.
     fn weighted_complex(&mut self, spec: &[C], ny: usize, nx: usize, which: Axis) -> Vec<C> {
         let cx: Vec<f64> = (0..nx).map(|m| one_plus_cos(m, nx)).collect();
@@ -146,7 +144,7 @@ impl Engine {
         }
     }
 
-    /// `(I_x, I_y)` of SPEC section 3. Since `Gx + Gy = 1`, `I_y = I - I_x`, so only one inverse FFT is needed.
+    /// `(I_x, I_y)` of Kellner 2016, eq. 4-5. Since `Gx + Gy = 1`, `I_y = I - I_x`, so only one inverse FFT is needed.
     pub fn weighted_pair(&mut self, plane: &Plane) -> (Plane, Plane) {
         let spec = self.spectrum(plane);
         let ix = self.weighted(&spec, plane.ny, plane.nx, Axis::X);

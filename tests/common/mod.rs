@@ -1,9 +1,14 @@
 //! Test phantoms: a high-resolution analytic-geometry image is truncated in k-space to make
 //! exactly Gibbs-corrupted low-resolution data, and block-averaged to make the ground truth.
+//! Also the NIfTI and CLI fixtures that the integration tests share.
 #![allow(dead_code)]
 
-use degibbs::{fft::Engine, plane::Plane};
+use assert_cmd::Command;
+use degibbs::{fft::Engine, io, pf::Pf, plane::Plane, shift::ShiftParams};
+use ndarray::ArrayD;
+use nifti::NiftiHeader;
 use rustfft::num_complex::Complex64 as C;
+use std::path::Path;
 
 struct Ellipse {
     cx: f64,
@@ -291,4 +296,49 @@ pub fn centroid_y(a: &Plane) -> f64 {
         }
     }
     s / w
+}
+
+/// `2 * pf - 1` of the acquired mode, the `nu` that `corrupted_and_truth` expects.
+pub fn nu(pf: Pf) -> f64 {
+    match pf {
+        Pf::Full => 1.0,
+        Pf::P78 => 0.75,
+        Pf::P68 => 0.5,
+        Pf::P58 => 0.25,
+    }
+}
+
+/// One plane through the partial-Fourier pipeline with the default shift parameters.
+pub fn run(cor: &Plane, pf: Pf) -> Plane {
+    let mut p = cor.clone();
+    Engine::new()
+        .rpg_plane(&mut p, pf, &ShiftParams::default())
+        .unwrap();
+    p
+}
+
+pub fn header() -> NiftiHeader {
+    NiftiHeader {
+        pixdim: [1.0, 2.0, 2.5, 3.0, 1.0, 0.0, 0.0, 0.0],
+        sform_code: 1,
+        srow_x: [2.0, 0.0, 0.0, -10.0],
+        srow_y: [0.0, 2.5, 0.0, -20.0],
+        srow_z: [0.0, 0.0, 3.0, -30.0],
+        ..Default::default()
+    }
+}
+
+/// Write `data` (complex64 if `imag` is given) with the test header.
+pub fn save(path: &Path, data: ArrayD<f32>, imag: Option<ArrayD<f32>>) {
+    let img = io::Image {
+        data,
+        imag,
+        header: header(),
+        extensions: None,
+    };
+    io::write(path, &img).unwrap();
+}
+
+pub fn cli() -> Command {
+    Command::cargo_bin("degibbs").unwrap()
 }

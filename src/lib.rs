@@ -29,13 +29,20 @@ pub struct Params {
     pub other_axis: usize,
 }
 
-/// Upper bound on planes held (as f64) at once; chunks are also capped by `PLANE_BUDGET_BYTES`.
+/// Cap on planes per chunk. `PLANE_BUDGET_BYTES` may lower it and the thread count may raise it.
 const MAX_PLANES_PER_CHUNK: usize = 512;
 const PLANE_BUDGET_BYTES: usize = 256 << 20;
 
 thread_local! {
     /// One FFT engine per worker thread, so plans and scratch buffers are reused across planes and chunks.
     static ENGINE: std::cell::RefCell<fft::Engine> = std::cell::RefCell::new(fft::Engine::new());
+}
+
+/// Planes per chunk for planes of `plane_bytes`: within the memory budget and the cap, but at least one per thread.
+fn planes_per_chunk(plane_bytes: usize) -> usize {
+    (PLANE_BUDGET_BYTES / plane_bytes)
+        .min(MAX_PLANES_PER_CHUNK)
+        .max(rayon::current_num_threads())
 }
 
 struct Layout {
@@ -58,6 +65,12 @@ fn prepare(vols: &mut [&mut ArrayD<f32>], p: &Params) -> Result<Layout> {
             "invalid plane axes (pe {}, other {}) for a {nd}D image",
             p.pe_axis,
             p.other_axis
+        );
+    }
+    if vols[0].shape()[p.pe_axis] == 0 || vols[0].shape()[p.other_axis] == 0 {
+        bail!(
+            "the plane axes must not be empty (shape {:?})",
+            vols[0].shape()
         );
     }
     p.shift.validate()?;
@@ -106,8 +119,7 @@ pub fn degibbs(vol: &mut ArrayD<f32>, p: &Params) -> Result<()> {
     let data = vol
         .as_slice_memory_order_mut()
         .expect("made contiguous above");
-    let per_chunk = (PLANE_BUDGET_BYTES / (nx * ny * 8))
-        .clamp(rayon::current_num_threads(), MAX_PLANES_PER_CHUNK);
+    let per_chunk = planes_per_chunk(nx * ny * 8);
     for chunk in bases.chunks(per_chunk) {
         let mut planes: Vec<Plane> = chunk
             .iter()
@@ -167,8 +179,7 @@ pub fn degibbs_complex(re: &mut ArrayD<f32>, im: &mut ArrayD<f32>, p: &Params) -
     let dim = im
         .as_slice_memory_order_mut()
         .expect("made contiguous above");
-    let per_chunk = (PLANE_BUDGET_BYTES / (nx * ny * 16))
-        .clamp(rayon::current_num_threads(), MAX_PLANES_PER_CHUNK);
+    let per_chunk = planes_per_chunk(nx * ny * 16);
     for chunk in bases.chunks(per_chunk) {
         let mut planes: Vec<CPlane> = chunk
             .iter()

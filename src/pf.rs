@@ -1,4 +1,4 @@
-//! Partial-Fourier (RPG) pipelines (SPEC section 4). PE axis is y.
+//! Partial-Fourier (RPG) pipelines (Lee 2021, sections 2-3). PE axis is y.
 
 use crate::{
     fft::Engine,
@@ -32,7 +32,7 @@ impl Pf {
         bail!("unsupported partial Fourier fraction {f}: supported values are 1, 7/8, 6/8 and 5/8")
     }
 
-    /// `(p, q)` of the up-sample / split pre-pass: `2*pf - 1 = p/q` (SPEC 4). `None` for the other modes.
+    /// `(p, q)` of the up-sample / split pre-pass: `2*pf - 1 = p/q` (Lee 2021). `None` for the other modes.
     fn pre_pass(self) -> Option<(usize, usize)> {
         match self {
             Pf::P78 => Some((3, 4)),

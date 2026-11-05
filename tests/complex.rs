@@ -1,11 +1,9 @@
 //! Complex input: library behaviour and the CLI rules (complex NIfTI, magnitude plus --phase).
 mod common;
 
-use assert_cmd::Command;
-use common::corrupted_and_truth_sl;
+use common::{cli, corrupted_and_truth_sl, header, save};
 use degibbs::{Params, Pf, ShiftParams, degibbs, degibbs_complex, io};
 use ndarray::{ArrayD, IxDyn, ShapeBuilder};
-use nifti::NiftiHeader;
 use std::path::Path;
 
 const N: usize = 48;
@@ -126,31 +124,6 @@ fn non_finite_voxels_in_either_part_stay_put() {
 }
 
 // ---- command line -------------------------------------------------------------------------------------------
-
-fn header() -> NiftiHeader {
-    NiftiHeader {
-        pixdim: [1.0, 2.0, 2.5, 3.0, 1.0, 0.0, 0.0, 0.0],
-        sform_code: 1,
-        srow_x: [2.0, 0.0, 0.0, -10.0],
-        srow_y: [0.0, 2.5, 0.0, -20.0],
-        srow_z: [0.0, 0.0, 3.0, -30.0],
-        ..Default::default()
-    }
-}
-
-fn save(path: &Path, data: ArrayD<f32>, imag: Option<ArrayD<f32>>) {
-    let img = io::Image {
-        data,
-        imag,
-        header: header(),
-        extensions: None,
-    };
-    io::write(path, &img).unwrap();
-}
-
-fn cli() -> Command {
-    Command::cargo_bin("degibbs").unwrap()
-}
 
 fn stderr(a: &assert_cmd::assert::Assert) -> String {
     String::from_utf8_lossy(&a.get_output().stderr).into_owned()

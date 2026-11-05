@@ -1,31 +1,14 @@
 //! Acquired-PF x correction-PF matrix on the Shepp-Logan phantom: which `--pf` setting works on which data.
 //! Run with `--nocapture` to print the table. The metric is the RMSE over flat tissue pixels (truth above 10, flat
-//! 11 x 11 window), so it is not the same as the README's brain mask and its numbers differ slightly.
+//! 11 x 11 window), so it is not the same as the brain mask in `docs/validation.md` and its numbers differ slightly.
 mod common;
 
 use common::*;
-use degibbs::{fft::Engine, pf::Pf, plane::Plane, shift::ShiftParams};
+use degibbs::pf::Pf;
 
 const R: usize = 8;
 const PFS: [Pf; 4] = [Pf::Full, Pf::P78, Pf::P68, Pf::P58];
 const NAMES: [&str; 4] = ["1", "7/8", "6/8", "5/8"];
-
-fn nu(pf: Pf) -> f64 {
-    match pf {
-        Pf::Full => 1.0,
-        Pf::P78 => 0.75,
-        Pf::P68 => 0.5,
-        Pf::P58 => 0.25,
-    }
-}
-
-fn run(cor: &Plane, pf: Pf) -> Plane {
-    let mut p = cor.clone();
-    Engine::new()
-        .rpg_plane(&mut p, pf, &ShiftParams::default())
-        .unwrap();
-    p
-}
 
 /// `[acquired][0] = uncorrected`, `[acquired][1 + correction]` = far-field RMSE after correction.
 fn matrix(nx: usize, ny: usize, side: i64) -> [[f64; 5]; 4] {

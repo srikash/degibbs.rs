@@ -6,22 +6,6 @@ use degibbs::{fft::Engine, pf::Pf, plane::Plane, shift::ShiftParams};
 
 const R: usize = 8;
 
-fn run(corrupted: &Plane, pf: Pf) -> Plane {
-    let mut e = Engine::new();
-    let mut p = corrupted.clone();
-    e.rpg_plane(&mut p, pf, &ShiftParams::default()).unwrap();
-    p
-}
-
-fn nu(pf: Pf) -> f64 {
-    match pf {
-        Pf::Full => 1.0,
-        Pf::P78 => 0.75,
-        Pf::P68 => 0.5,
-        Pf::P58 => 0.25,
-    }
-}
-
 #[test]
 fn full_fourier_correction_reduces_error_on_all_plane_shapes() {
     // even x even (incl. the 0/0 weight corner), odd, and mixed sizes
