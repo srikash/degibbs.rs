@@ -38,6 +38,13 @@ thread_local! {
     static ENGINE: std::cell::RefCell<fft::Engine> = std::cell::RefCell::new(fft::Engine::new());
 }
 
+/// Planes per chunk for planes of `plane_bytes`: within the memory budget and the cap, but at least one per thread.
+fn planes_per_chunk(plane_bytes: usize) -> usize {
+    (PLANE_BUDGET_BYTES / plane_bytes)
+        .min(MAX_PLANES_PER_CHUNK)
+        .max(rayon::current_num_threads())
+}
+
 struct Layout {
     nx: usize,
     ny: usize,
@@ -106,9 +113,7 @@ pub fn degibbs(vol: &mut ArrayD<f32>, p: &Params) -> Result<()> {
     let data = vol
         .as_slice_memory_order_mut()
         .expect("made contiguous above");
-    let per_chunk = (PLANE_BUDGET_BYTES / (nx * ny * 8))
-        .min(MAX_PLANES_PER_CHUNK)
-        .max(rayon::current_num_threads()); // at least one plane per thread, even above the cap
+    let per_chunk = planes_per_chunk(nx * ny * 8);
     for chunk in bases.chunks(per_chunk) {
         let mut planes: Vec<Plane> = chunk
             .iter()
@@ -168,9 +173,7 @@ pub fn degibbs_complex(re: &mut ArrayD<f32>, im: &mut ArrayD<f32>, p: &Params) -
     let dim = im
         .as_slice_memory_order_mut()
         .expect("made contiguous above");
-    let per_chunk = (PLANE_BUDGET_BYTES / (nx * ny * 16))
-        .min(MAX_PLANES_PER_CHUNK)
-        .max(rayon::current_num_threads()); // at least one plane per thread, even above the cap
+    let per_chunk = planes_per_chunk(nx * ny * 16);
     for chunk in bases.chunks(per_chunk) {
         let mut planes: Vec<CPlane> = chunk
             .iter()

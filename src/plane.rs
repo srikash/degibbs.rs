@@ -21,9 +21,7 @@ impl Plane {
             ny,
         }
     }
-}
 
-impl Plane {
     /// `self = a + b` (same dimensions).
     pub fn assign_sum(&mut self, a: &Plane, b: &Plane) {
         for ((o, x), y) in self.data.iter_mut().zip(&a.data).zip(&b.data) {
