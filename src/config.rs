@@ -13,6 +13,8 @@ pub struct Requested {
     pub pe_axis: Option<String>,
     pub axes: Option<String>,
     pub pf: Option<String>,
+    /// The scanner already filled in the missing k-space (POCS): treat as full Fourier, ignore the sidecar factor.
+    pub pocs: bool,
     pub shift: ShiftParams,
     /// The input is complex (a complex NIfTI, or a magnitude image with `--phase`).
     pub complex: bool,
@@ -33,7 +35,7 @@ pub fn parse_pf(s: &str) -> Result<Pf> {
     Pf::from_fraction(v)
 }
 
-fn parse_axes(s: &str) -> Result<(usize, usize)> {
+pub fn parse_axes(s: &str) -> Result<(usize, usize)> {
     let (a, b) = s
         .split_once(',')
         .ok_or_else(|| anyhow!("--axes expects two comma-separated axes, e.g. 0,1"))?;
@@ -103,20 +105,38 @@ pub fn resolve(req: &Requested, sidecar: Option<&Sidecar>, ndim: usize) -> Resul
         }
         Pf::Full
     } else {
-        match (&req.pf, sidecar_pf) {
-            (Some(s), _) => parse_pf(s)?,
-            (None, Some(v)) => {
-                let pf = Pf::from_fraction(v)?;
-                if pf != Pf::Full {
-                    notices.push(format!(
-                        "partial Fourier factor {v} taken from the sidecar; if the data were POCS or homodyne reconstructed, pass --pf 1"
-                    ));
-                }
-                pf
+        if req.pocs {
+            if let Some(s) = &req.pf
+                && parse_pf(s)? != Pf::Full
+            {
+                bail!(
+                    "--pocs says the scanner already filled in the missing k-space (full Fourier), \
+                         which contradicts --pf {s}: drop one of them"
+                );
             }
-            (None, None) => {
-                notices.push("no partial Fourier factor given (no --pf, no PartialFourier in a sidecar): assuming full Fourier".into());
-                Pf::Full
+            if let Some(v) = sidecar_pf.filter(|&v| v < 0.99) {
+                notices.push(format!(
+                    "--pocs: treating the image as full Fourier and ignoring PartialFourier {v} in the sidecar"
+                ));
+            }
+            Pf::Full
+        } else {
+            match (&req.pf, sidecar_pf) {
+                (Some(s), _) => parse_pf(s)?,
+                (None, Some(v)) => {
+                    let pf = Pf::from_fraction(v)?;
+                    if pf != Pf::Full {
+                        notices.push(format!(
+                            "partial Fourier factor {v} taken from the sidecar; if the scanner already filled in the missing k-space (POCS), pass --pocs"
+                        ));
+                    }
+                    pf
+                }
+                (None, None) => bail!(
+                    "the partial Fourier factor is unknown: the sidecar has no PartialFourier (or there is no sidecar). \
+                     Pass --pf 1 if the k-space was fully acquired, --pf 7/8, --pf 6/8 or --pf 5/8 if it was partial, \
+                     or --pocs if the scanner already filled in the missing k-space (POCS)"
+                ),
             }
         }
     };
@@ -154,7 +174,7 @@ mod tests {
             (1, 0, Pf::P68)
         );
         assert_eq!(r.notices.len(), 1);
-        assert!(r.notices[0].contains("pass --pf 1"));
+        assert!(r.notices[0].contains("--pocs"));
     }
 
     #[test]
@@ -220,15 +240,50 @@ mod tests {
         assert!(resolve(&Requested::default(), Some(&sc("{}")), 4).is_err());
     }
 
-    #[test]
-    fn absent_pf_assumes_full_fourier_with_notice() {
-        let req = Requested {
+    fn mag_req(pf: Option<&str>, pocs: bool) -> Requested {
+        Requested {
             pe_axis: Some("j".into()),
+            pf: pf.map(Into::into),
+            pocs,
             ..Default::default()
-        };
-        let r = resolve(&req, None, 3).unwrap();
+        }
+    }
+
+    #[test]
+    fn unknown_pf_is_an_error_naming_the_fixes() {
+        for json in [None, Some(sc(r#"{"PhaseEncodingDirection":"j"}"#))] {
+            let e = resolve(&mag_req(None, false), json.as_ref(), 3).unwrap_err();
+            let m = format!("{e}");
+            assert!(m.contains("--pf 1") && m.contains("--pocs"), "{m}");
+        }
+    }
+
+    #[test]
+    fn pocs_means_full_fourier_and_ignores_the_sidecar() {
+        let json = sc(r#"{"PartialFourier":0.75}"#);
+        let r = resolve(&mag_req(None, true), Some(&json), 3).unwrap();
         assert_eq!(r.params.pf, Pf::Full);
         assert_eq!(r.notices.len(), 1);
+        assert!(r.notices[0].contains("ignoring PartialFourier"));
+        // no sidecar needed, no note when there is nothing to ignore
+        let r = resolve(&mag_req(None, true), None, 3).unwrap();
+        assert_eq!(r.params.pf, Pf::Full);
+        assert!(r.notices.is_empty());
+        // --pf 1 agrees with --pocs
+        assert!(resolve(&mag_req(Some("1"), true), None, 3).is_ok());
+    }
+
+    #[test]
+    fn pocs_contradicting_pf_is_an_error() {
+        let e = resolve(&mag_req(Some("6/8"), true), None, 3).unwrap_err();
+        assert!(format!("{e}").contains("contradicts"));
+    }
+
+    #[test]
+    fn pocs_is_accepted_for_complex_input() {
+        let mut req = complex_req(None);
+        req.pocs = true;
+        assert_eq!(resolve(&req, None, 3).unwrap().params.pf, Pf::Full);
     }
 
     #[test]
@@ -236,7 +291,7 @@ mod tests {
         let r = resolve(
             &Requested::default(),
             Some(&sc(
-                r#"{"PhaseEncodingDirection":"k","SliceEncodingDirection":"i"}"#,
+                r#"{"PhaseEncodingDirection":"k","SliceEncodingDirection":"i","PartialFourier":1}"#,
             )),
             4,
         )
@@ -254,6 +309,7 @@ mod tests {
         let req = Requested {
             pe_axis: Some("k".into()),
             axes: Some("1,2".into()),
+            pocs: true,
             ..Default::default()
         };
         assert_eq!(resolve(&req, None, 4).unwrap().params.other_axis, 1);

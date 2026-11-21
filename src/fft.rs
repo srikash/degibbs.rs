@@ -14,6 +14,8 @@ pub struct Engine {
     column: Vec<C>,
     /// Working memory of the 1D kernel (see `shift.rs`).
     pub(crate) kernel: crate::shift::KernelScratch,
+    /// Spread the lines of one plane over the rayon pool (for inputs with fewer planes than threads).
+    pub par_lines: bool,
 }
 
 impl Default for Engine {
@@ -31,6 +33,7 @@ impl Engine {
             scratch: Vec::new(),
             column: Vec::new(),
             kernel: Default::default(),
+            par_lines: false,
         }
     }
 

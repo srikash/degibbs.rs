@@ -132,7 +132,7 @@ fn cli_reads_pe_and_pf_from_the_sidecar() {
 }
 
 #[test]
-fn cli_flags_override_the_sidecar_and_missing_pf_prints_a_notice() {
+fn cli_flags_override_the_sidecar() {
     let dir = tempfile::tempdir().unwrap();
     let (v, _) = volume(36, 40, 1, 1, 1.0);
     let input = dir.path().join("a.nii");
@@ -146,11 +146,10 @@ fn cli_flags_override_the_sidecar_and_missing_pf_prints_a_notice() {
     let assert = cli()
         .arg(&input)
         .arg(&output)
-        .args(["--pe-axis", "j"])
+        .args(["--pe-axis", "j", "--pf", "1"])
         .assert()
         .success();
-    let stderr = String::from_utf8_lossy(&assert.get_output().stderr).into_owned();
-    assert!(stderr.contains("assuming full Fourier"), "{stderr}");
+    let _ = assert;
     let mut want = v;
     degibbs(&mut want, &params(Pf::Full, 1, 0)).unwrap();
     for (a, b) in io::read(&output).unwrap().data.iter().zip(want.iter()) {
@@ -221,13 +220,13 @@ fn cli_ignores_a_malformed_auto_sidecar_when_flags_suffice_and_rejects_bad_outpu
     cli()
         .arg(&input)
         .arg(dir.path().join("o.nii"))
-        .args(["--pe-axis", "j"])
+        .args(["--pe-axis", "j", "--pf", "1"])
         .assert()
         .success();
     cli()
         .arg(&input)
         .arg(dir.path().join("o.img"))
-        .args(["--pe-axis", "j"])
+        .args(["--pe-axis", "j", "--pf", "1"])
         .assert()
         .failure();
 }

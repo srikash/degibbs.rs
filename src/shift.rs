@@ -57,6 +57,9 @@ pub(crate) struct KernelScratch {
     absdiff: Vec<f64>,
     spec: Vec<C>,
     work: Vec<C>,
+    /// Second shifted spectrum and its output row, for the pairs that share one inverse FFT (real input).
+    second: Vec<C>,
+    shifted_b: Vec<f64>,
     /// One absdiff row with `max_w + 1` wrapped samples on each side, so the window sums need no modulo.
     ext: Vec<f64>,
     best: Vec<f64>,
@@ -137,6 +140,7 @@ impl Engine {
         k.absdiff.resize(ns * n, 0.0);
         k.spec.resize(n, C::new(0.0, 0.0));
         k.work.resize(n, C::new(0.0, 0.0));
+        k.shifted_b.resize(n, 0.0);
         let mut spec = std::mem::take(&mut k.spec);
         let mut work = std::mem::take(&mut k.work);
 
@@ -146,34 +150,55 @@ impl Engine {
         self.fft1(&mut spec, false);
 
         let inv_n = 1.0 / n as f64;
-        for si in 0..ns {
-            let s = si as isize - m as isize;
-            let row = &mut k.shifted[si * n..(si + 1) * n];
-            if s == 0 {
-                row.copy_from_slice(line);
-                if let Some(v) = line_im {
-                    k.shifted_im[si * n..(si + 1) * n].copy_from_slice(v);
-                }
-                continue;
-            }
+        k.shifted[m * n..(m + 1) * n].copy_from_slice(line); // s = 0
+        if let Some(v) = line_im {
+            k.shifted_im[m * n..(m + 1) * n].copy_from_slice(v);
+        }
+        let nyq = n.is_multiple_of(2).then_some(n / 2);
+        let shifted_spectrum = |work: &mut [C], si: usize, w: C| {
             let phases = &table[si * n..(si + 1) * n];
-            for (j, w) in work.iter_mut().enumerate() {
-                *w = spec[j] * phases[j];
+            for (j, o) in work.iter_mut().enumerate() {
+                *o = spec[j] * phases[j] * w;
             }
-            if n.is_multiple_of(2) {
-                work[n / 2] = C::new(0.0, 0.0); // Nyquist zeroed in shifted copies
+            if let Some(q) = nyq {
+                work[q] = C::new(0.0, 0.0); // Nyquist zeroed in shifted copies
             }
-            self.fft1(&mut work, true);
-            for (r, w) in row.iter_mut().zip(work.iter()) {
-                *r = w.re * inv_n;
-            }
-            if has_im {
-                for (r, w) in k.shifted_im[si * n..(si + 1) * n]
-                    .iter_mut()
-                    .zip(work.iter())
-                {
+        };
+        let others: Vec<usize> = (0..ns).filter(|&si| si != m).collect();
+        if has_im {
+            for &si in &others {
+                shifted_spectrum(&mut work, si, C::new(1.0, 0.0));
+                self.fft1(&mut work, true);
+                for (r, w) in k.shifted[si * n..(si + 1) * n].iter_mut().zip(&work) {
+                    *r = w.re * inv_n;
+                }
+                for (r, w) in k.shifted_im[si * n..(si + 1) * n].iter_mut().zip(&work) {
                     *r = w.im * inv_n;
                 }
+            }
+        } else {
+            // Real input: every shifted copy is real, so two of them share one complex inverse FFT
+            // (one in the real part, one in the imaginary part). `others` has an even length (2M).
+            for pair in others.chunks(2) {
+                let (a, b) = (pair[0], pair[1]);
+                shifted_spectrum(&mut work, a, C::new(1.0, 0.0));
+                let mut second = std::mem::take(&mut k.second);
+                second.resize(n, C::new(0.0, 0.0));
+                shifted_spectrum(&mut second, b, C::new(0.0, 1.0));
+                for (w, x) in work.iter_mut().zip(&second) {
+                    *w += *x;
+                }
+                k.second = second;
+                self.fft1(&mut work, true);
+                for ((ra, rb), w) in k.shifted[a * n..(a + 1) * n]
+                    .iter_mut()
+                    .zip(k.shifted_b.iter_mut())
+                    .zip(&work)
+                {
+                    *ra = w.re * inv_n;
+                    *rb = w.im * inv_n;
+                }
+                k.shifted[b * n..(b + 1) * n].copy_from_slice(&k.shifted_b);
             }
         }
         for si in 0..ns {

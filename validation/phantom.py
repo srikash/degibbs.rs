@@ -97,7 +97,7 @@ class Setup:
 def run(exe, out, img, pf, tag):
     inp, res = f'{out}/{tag}.nii.gz', f'{out}/{tag}_c.nii.gz'
     nib.save(nib.Nifti1Image(np.repeat(img.T[:, :, None], 4, 2).astype(np.float32), np.eye(4)), inp)
-    subprocess.run([exe, inp, res, '--pe-axis', 'j', '--pf', str(pf), '--no-json'], check=True, capture_output=True)
+    subprocess.run([exe, inp, res, '--pe-axis', 'j', '--pf', str(pf), '--no-json', '--overwrite'], check=True, capture_output=True)
     return np.asanyarray(nib.load(res).dataobj)[:, :, 0].T.astype(float)
 
 
@@ -124,7 +124,7 @@ def evaluate(a, exe, out, offsets, side, phase, snr, seeds, n, r):
 def run_complex(exe, out, z, tag):
     inp, res = f'{out}/{tag}.nii.gz', f'{out}/{tag}_c.nii.gz'
     nib.save(nib.Nifti1Image(np.repeat(z.T[:, :, None], 4, 2).astype(np.complex64), np.eye(4)), inp)
-    subprocess.run([exe, inp, res, '--pe-axis', 'j', '--no-json'], check=True, capture_output=True)
+    subprocess.run([exe, inp, res, '--pe-axis', 'j', '--no-json', '--overwrite'], check=True, capture_output=True)
     return np.asanyarray(nib.load(res).dataobj)[:, :, 0].T
 
 

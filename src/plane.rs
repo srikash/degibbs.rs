@@ -1,8 +1,10 @@
 //! 2D plane operations (Kellner 2016, eq. 4-5 and Fig. 3): axis-wise unringing and the full-Fourier "SuShi" pipeline.
 //! Plane layout is row-major with y (the phase-encoding axis) as the slow axis: `data[y * nx + x]`.
 
+use crate::ENGINE;
 use crate::{fft::Engine, shift::ShiftParams};
 use anyhow::Result;
+use rayon::prelude::*;
 use rustfft::num_complex::Complex64 as C;
 use std::f64::consts::PI;
 
@@ -72,6 +74,38 @@ impl Engine {
         p: &ShiftParams,
     ) -> Result<()> {
         let (nx, ny) = (plane.nx, plane.ny);
+        let p = *p;
+        let p = &p;
+        if self.par_lines {
+            // Every line is independent and the kernel is deterministic, so this gives the same result.
+            return match axis {
+                Axis::X => plane.data.par_chunks_exact_mut(nx).try_for_each(|row| {
+                    let mut out = vec![0.0; nx];
+                    ENGINE.with(|e| e.borrow_mut().unring_line(row, &mut out, p))?;
+                    row.copy_from_slice(&out);
+                    Ok(())
+                }),
+                Axis::Y => {
+                    let rows: Vec<usize> = (offset..ny).step_by(step).collect();
+                    let data = &plane.data;
+                    let cols = (0..nx)
+                        .into_par_iter()
+                        .map(|x| {
+                            let col: Vec<f64> = rows.iter().map(|&y| data[y * nx + x]).collect();
+                            let mut out = vec![0.0; rows.len()];
+                            ENGINE.with(|e| e.borrow_mut().unring_line(&col, &mut out, p))?;
+                            Ok(out)
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    for (x, out) in cols.iter().enumerate() {
+                        for (i, &y) in rows.iter().enumerate() {
+                            plane.data[y * nx + x] = out[i];
+                        }
+                    }
+                    Ok(())
+                }
+            };
+        }
         match axis {
             Axis::X => {
                 let mut out = vec![0.0; nx];
@@ -182,17 +216,44 @@ impl Engine {
             Axis::X => nx,
             Axis::Y => ny,
         };
-        let (mut re, mut im) = (vec![0.0; len], vec![0.0; len]);
-        let (mut out_re, mut out_im) = (vec![0.0; len], vec![0.0; len]);
         let lines = match axis {
             Axis::X => ny,
             Axis::Y => nx,
         };
+        let at = |l: usize, i: usize| match axis {
+            Axis::X => l * nx + i,
+            Axis::Y => i * nx + l,
+        };
+        if self.par_lines {
+            let p = *p;
+            let data = &plane.data;
+            let done = (0..lines)
+                .into_par_iter()
+                .map(|l| {
+                    let (mut re, mut im) = (vec![0.0; len], vec![0.0; len]);
+                    let (mut out_re, mut out_im) = (vec![0.0; len], vec![0.0; len]);
+                    for i in 0..len {
+                        let v = data[at(l, i)];
+                        (re[i], im[i]) = (v.re, v.im);
+                    }
+                    ENGINE.with(|e| {
+                        e.borrow_mut()
+                            .unring_line_complex(&re, &im, &mut out_re, &mut out_im, &p)
+                    })?;
+                    Ok((out_re, out_im))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            for (l, (out_re, out_im)) in done.iter().enumerate() {
+                for i in 0..len {
+                    plane.data[at(l, i)] = C::new(out_re[i], out_im[i]);
+                }
+            }
+            return Ok(());
+        }
+        let (mut re, mut im) = (vec![0.0; len], vec![0.0; len]);
+        let (mut out_re, mut out_im) = (vec![0.0; len], vec![0.0; len]);
         for l in 0..lines {
-            let at = |i: usize| match axis {
-                Axis::X => l * nx + i,
-                Axis::Y => i * nx + l,
-            };
+            let at = |i: usize| at(l, i);
             for i in 0..len {
                 let v = plane.data[at(i)];
                 (re[i], im[i]) = (v.re, v.im);

@@ -146,7 +146,7 @@ fn complex_nifti_round_trips_as_complex64_and_runs_as_full_fourier() {
     let run = cli().arg(&input).arg(&output).assert().success();
     let err = stderr(&run);
     assert!(err.contains("POCS"), "{err}");
-    assert!(err.contains("PF Full"), "{err}");
+    assert!(err.contains("partial Fourier 1 (full Fourier)"), "{err}");
 
     let got = io::read(&output).unwrap();
     assert_eq!(got.header.datatype, 32);

@@ -29,20 +29,43 @@ pub struct Params {
     pub other_axis: usize,
 }
 
-/// Cap on planes per chunk. `PLANE_BUDGET_BYTES` may lower it and the thread count may raise it.
-const MAX_PLANES_PER_CHUNK: usize = 512;
-const PLANE_BUDGET_BYTES: usize = 256 << 20;
-
 thread_local! {
     /// One FFT engine per worker thread, so plans and scratch buffers are reused across planes and chunks.
     static ENGINE: std::cell::RefCell<fft::Engine> = std::cell::RefCell::new(fft::Engine::new());
 }
 
-/// Planes per chunk for planes of `plane_bytes`: within the memory budget and the cap, but at least one per thread.
-fn planes_per_chunk(plane_bytes: usize) -> usize {
-    (PLANE_BUDGET_BYTES / plane_bytes)
-        .min(MAX_PLANES_PER_CHUNK)
-        .max(rayon::current_num_threads())
+/// A raw view of an array that worker threads write through. Each plane touches only its own elements
+/// (the base offsets of two planes never produce the same index), so the accesses never overlap.
+#[derive(Clone, Copy)]
+struct Shared(*mut f32);
+unsafe impl Send for Shared {}
+unsafe impl Sync for Shared {}
+impl Shared {
+    /// SAFETY: `i` must be inside the array and not written by another thread at the same time.
+    unsafe fn get(self, i: usize) -> f32 {
+        unsafe { *self.0.add(i) }
+    }
+    /// SAFETY: as for `get`.
+    unsafe fn set(self, i: usize, v: f32) {
+        unsafe { *self.0.add(i) = v }
+    }
+}
+
+/// Run `f` for every plane base: planes in parallel when there are at least as many as threads, otherwise one
+/// plane at a time with the lines of each plane spread over the threads. The result does not depend on which.
+fn for_each_plane<F>(bases: &[usize], f: F) -> Result<()>
+where
+    F: Fn(&mut fft::Engine, usize) -> Result<()> + Sync,
+{
+    if bases.len() < rayon::current_num_threads() {
+        let mut engine = fft::Engine::new();
+        engine.par_lines = true;
+        bases.iter().try_for_each(|&b| f(&mut engine, b))
+    } else {
+        bases
+            .par_iter()
+            .try_for_each(|&b| ENGINE.with(|e| f(&mut e.borrow_mut(), b)))
+    }
 }
 
 struct Layout {
@@ -116,40 +139,35 @@ pub fn degibbs(vol: &mut ArrayD<f32>, p: &Params) -> Result<()> {
         sy,
         bases,
     } = prepare(&mut [vol], p)?;
-    let data = vol
-        .as_slice_memory_order_mut()
-        .expect("made contiguous above");
-    let per_chunk = planes_per_chunk(nx * ny * 8);
-    for chunk in bases.chunks(per_chunk) {
-        let mut planes: Vec<Plane> = chunk
-            .iter()
-            .map(|&b| {
-                let mut pl = Plane::new(nx, ny);
-                for y in 0..ny {
-                    for x in 0..nx {
-                        let v = data[b + y * sy + x * sx];
-                        // NaN/Inf (e.g. outside a mask) are processed as 0 and restored below.
-                        pl.data[y * nx + x] = if v.is_finite() { v as f64 } else { 0.0 };
-                    }
-                }
-                pl
-            })
-            .collect();
-        planes
-            .par_iter_mut()
-            .try_for_each(|pl| ENGINE.with(|e| e.borrow_mut().rpg_plane(pl, p.pf, &p.shift)))?;
-        for (&b, pl) in chunk.iter().zip(&planes) {
-            for y in 0..ny {
-                for x in 0..nx {
-                    let i = b + y * sy + x * sx;
-                    if data[i].is_finite() {
-                        data[i] = pl.data[y * nx + x] as f32;
+    let data = Shared(
+        vol.as_slice_memory_order_mut()
+            .expect("made contiguous above")
+            .as_mut_ptr(),
+    );
+    for_each_plane(&bases, |engine, b| {
+        let mut pl = Plane::new(nx, ny);
+        for y in 0..ny {
+            for x in 0..nx {
+                // SAFETY: this plane's own element, see `Shared`.
+                let v = unsafe { data.get(b + y * sy + x * sx) };
+                // NaN/Inf (e.g. outside a mask) are processed as 0 and restored below.
+                pl.data[y * nx + x] = if v.is_finite() { v as f64 } else { 0.0 };
+            }
+        }
+        engine.rpg_plane(&mut pl, p.pf, &p.shift)?;
+        for y in 0..ny {
+            for x in 0..nx {
+                let i = b + y * sy + x * sx;
+                // SAFETY: as above.
+                unsafe {
+                    if data.get(i).is_finite() {
+                        data.set(i, pl.data[y * nx + x] as f32);
                     }
                 }
             }
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 /// Complex counterpart of [`degibbs`] for an image given as real and imaginary parts of equal shape.
@@ -173,46 +191,45 @@ pub fn degibbs_complex(re: &mut ArrayD<f32>, im: &mut ArrayD<f32>, p: &Params) -
         sy,
         bases,
     } = prepare(&mut [re, im], p)?;
-    let dre = re
-        .as_slice_memory_order_mut()
-        .expect("made contiguous above");
-    let dim = im
-        .as_slice_memory_order_mut()
-        .expect("made contiguous above");
-    let per_chunk = planes_per_chunk(nx * ny * 16);
-    for chunk in bases.chunks(per_chunk) {
-        let mut planes: Vec<CPlane> = chunk
-            .iter()
-            .map(|&b| {
-                let mut pl = CPlane::new(nx, ny);
-                for y in 0..ny {
-                    for x in 0..nx {
-                        let i = b + y * sy + x * sx;
-                        // A voxel with a NaN/Inf in either part is processed as 0 and restored below.
-                        pl.data[y * nx + x] = if dre[i].is_finite() && dim[i].is_finite() {
-                            C::new(dre[i] as f64, dim[i] as f64)
-                        } else {
-                            C::new(0.0, 0.0)
-                        };
-                    }
-                }
-                pl
-            })
-            .collect();
-        planes
-            .par_iter_mut()
-            .try_for_each(|pl| ENGINE.with(|e| e.borrow_mut().rpg_plane_complex(pl, &p.shift)))?;
-        for (&b, pl) in chunk.iter().zip(&planes) {
-            for y in 0..ny {
-                for x in 0..nx {
-                    let i = b + y * sy + x * sx;
-                    if dre[i].is_finite() && dim[i].is_finite() {
+    let dre = Shared(
+        re.as_slice_memory_order_mut()
+            .expect("made contiguous above")
+            .as_mut_ptr(),
+    );
+    let dim = Shared(
+        im.as_slice_memory_order_mut()
+            .expect("made contiguous above")
+            .as_mut_ptr(),
+    );
+    for_each_plane(&bases, |engine, b| {
+        let mut pl = CPlane::new(nx, ny);
+        for y in 0..ny {
+            for x in 0..nx {
+                let i = b + y * sy + x * sx;
+                // SAFETY: this plane's own elements, see `Shared`.
+                let (r, m) = unsafe { (dre.get(i), dim.get(i)) };
+                // A voxel with a NaN/Inf in either part is processed as 0 and restored below.
+                pl.data[y * nx + x] = if r.is_finite() && m.is_finite() {
+                    C::new(r as f64, m as f64)
+                } else {
+                    C::new(0.0, 0.0)
+                };
+            }
+        }
+        engine.rpg_plane_complex(&mut pl, &p.shift)?;
+        for y in 0..ny {
+            for x in 0..nx {
+                let i = b + y * sy + x * sx;
+                // SAFETY: as above.
+                unsafe {
+                    if dre.get(i).is_finite() && dim.get(i).is_finite() {
                         let v = pl.data[y * nx + x];
-                        (dre[i], dim[i]) = (v.re as f32, v.im as f32);
+                        dre.set(i, v.re as f32);
+                        dim.set(i, v.im as f32);
                     }
                 }
             }
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }

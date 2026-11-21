@@ -20,6 +20,12 @@ pub struct Image {
     pub extensions: Option<ExtensionSequence>,
 }
 
+/// Header only (cheap): number of dimensions and whether the data are complex.
+pub fn peek(path: &Path) -> Result<(usize, bool)> {
+    let h = NiftiHeader::from_file(path).with_context(|| format!("reading {}", path.display()))?;
+    Ok((h.dim[0] as usize, matches!(h.datatype, 32 | 1792)))
+}
+
 /// Read a `.nii`/`.nii.gz`; `scl_slope`/`scl_inter` are applied.
 pub fn read(path: &Path) -> Result<Image> {
     let obj = ReaderOptions::new()

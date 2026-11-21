@@ -28,10 +28,17 @@ cargo install --git https://github.com/srikash/degibbs.rs
 ```
 degibbs in.nii.gz out.nii.gz --pe-axis j --pf 6/8
 degibbs dwi.nii.gz dwi_degibbs.nii.gz            # reads dwi.json (BIDS sidecar)
+degibbs in.nii.gz out.nii.gz --pe-axis j --pocs  # the scanner already filled in the missing k-space
+degibbs -h                                       # the options you normally need
+degibbs --full-help                              # everything, including expert options
 ```
 
-> [!WARNING]
-> If no partial-Fourier factor is available, the tool assumes full Fourier and says so on stderr. This is the most likely way to get a wrong result. Check that message for partial-Fourier data.
+> [!IMPORTANT]
+> degibbs never guesses the partial Fourier factor. If the sidecar has no `PartialFourier` (some converters leave it out, and a processed copy often has no sidecar), pass `--pf` (`1` for full Fourier), `--pocs`, or `--json` pointing at the original scan's sidecar. Without one of these degibbs stops with an error.
+
+Existing outputs are never replaced unless you pass `--overwrite`. Every output gets a `.json` beside it with the settings used.
+
+**Stability.** Within a minor version (for example 0.4.x), option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. Pin `0.4` in pipelines.
 
 ## Documentation
 

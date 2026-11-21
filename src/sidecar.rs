@@ -27,9 +27,18 @@ pub struct Sidecar {
 
 impl Sidecar {
     pub fn from_path(path: &Path) -> Result<Self> {
+        Ok(Self::from_path_raw(path)?.0)
+    }
+
+    /// The parsed fields plus the whole JSON object, so an output sidecar can carry every key through.
+    pub fn from_path_raw(path: &Path) -> Result<(Self, serde_json::Value)> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading sidecar {}", path.display()))?;
-        serde_json::from_str(&text).with_context(|| format!("parsing sidecar {}", path.display()))
+        let raw: serde_json::Value = serde_json::from_str(&text)
+            .with_context(|| format!("parsing sidecar {}", path.display()))?;
+        let sc = Self::deserialize(&raw)
+            .with_context(|| format!("parsing sidecar {}", path.display()))?;
+        Ok((sc, raw))
     }
 
     pub fn pe_axis(&self) -> Result<Option<usize>> {
