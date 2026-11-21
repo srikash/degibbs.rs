@@ -171,7 +171,7 @@ fn the_output_sidecar_carries_the_input_keys_and_a_degibbs_record() {
         serde_json::from_str(&std::fs::read_to_string(dir.path().join("o.json")).unwrap()).unwrap();
     assert_eq!(v["PhaseEncodingDirection"], "j-");
     assert_eq!(v["TotalReadoutTime"], 0.05);
-    let d = &v["Degibbs"];
+    let d = &v["DeGibbs"];
     assert_eq!(d["Version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(d["PhaseEncodingAxis"], 1);
     assert_eq!(d["Nshifts"], 20);
@@ -181,7 +181,7 @@ fn the_output_sidecar_carries_the_input_keys_and_a_degibbs_record() {
     assert!(
         !std::fs::read_to_string(dir.path().join("a.json"))
             .unwrap()
-            .contains("Degibbs")
+            .contains("DeGibbs")
     );
 }
 
@@ -198,7 +198,7 @@ fn without_an_input_sidecar_the_output_sidecar_has_only_the_record() {
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(dir.path().join("o.json")).unwrap()).unwrap();
     assert_eq!(v.as_object().unwrap().len(), 1);
-    assert_eq!(v["Degibbs"]["Pocs"], true);
+    assert_eq!(v["DeGibbs"]["Pocs"], true);
 }
 
 #[test]

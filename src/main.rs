@@ -363,16 +363,16 @@ fn run(cli: Cli) -> Result<()> {
     Ok(())
 }
 
-/// The input sidecar's keys carried through unchanged, plus one `Degibbs` record.
+/// The input sidecar's keys carried through unchanged, plus one `DeGibbs` record.
 fn write_sidecar(path: &Path, input: Option<&Value>, record: &Value) -> Result<()> {
     let mut obj = match input {
         Some(Value::Object(m)) => m.clone(),
         _ => Default::default(),
     };
-    if obj.contains_key("Degibbs") {
-        eprintln!("degibbs: note: replacing the Degibbs record already in the input sidecar");
+    if obj.contains_key("DeGibbs") {
+        eprintln!("degibbs: note: replacing the DeGibbs record already in the input sidecar");
     }
-    obj.insert("Degibbs".into(), record.clone());
+    obj.insert("DeGibbs".into(), record.clone());
     let text = serde_json::to_string_pretty(&Value::Object(obj))?;
     std::fs::write(path, text + "\n").with_context(|| format!("writing {}", path.display()))
 }
