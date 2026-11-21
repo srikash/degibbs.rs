@@ -19,7 +19,7 @@ const SHORT_HELP_FOOTER: &str =
 ///
 /// The phase-encoding direction and partial Fourier factor are read from the image's BIDS JSON sidecar when it has
 /// them; the options below override or replace it. A magnitude image must have a known partial Fourier factor:
-/// degibbs never guesses it. Complex input is processed as full Fourier.
+/// DeGibbs never guesses it. Complex input is processed as full Fourier.
 #[derive(Parser, Debug)]
 #[command(version, disable_help_flag = true)]
 struct Cli {
@@ -37,7 +37,7 @@ struct Cli {
     pe_axis: Option<String>,
     /// Partial Fourier factor: the fraction of k-space the scanner acquired along the phase-encoding direction. One
     /// of 1 (all of it), 7/8, 6/8 or 5/8, or the same as a decimal (0.75). Needed for magnitude images; taken from
-    /// PartialFourier in the sidecar if not given, and degibbs stops if it cannot be found
+    /// PartialFourier in the sidecar if not given, and DeGibbs stops if it cannot be found
     #[arg(long, value_name = "FACTOR", help_heading = "Acquisition")]
     pf: Option<String>,
     /// The scanner already filled in the missing k-space with POCS reconstruction, so treat the image as full
@@ -69,7 +69,7 @@ struct Cli {
     /// Where to write the corrected phase image (radians). Needs --phase
     #[arg(long, value_name = "FILE", requires = "phase", help_heading = "Files")]
     phase_out: Option<PathBuf>,
-    /// Replace output files that already exist. Without it degibbs stops rather than overwrite anything. The input
+    /// Replace output files that already exist. Without it DeGibbs stops rather than overwrite anything. The input
     /// is never overwritten
     #[arg(long, help_heading = "Files")]
     overwrite: bool,
@@ -93,7 +93,7 @@ struct Cli {
     /// tried at each voxel. Larger is finer but slower. Maximum 1000
     #[arg(long, value_name = "M", default_value_t = 20, help_heading = "Expert")]
     nshifts: usize,
-    /// Nearest distance, in voxels, used to judge ringing. For each trial shift, degibbs adds up the voxel-to-voxel
+    /// Nearest distance, in voxels, used to judge ringing. For each trial shift, DeGibbs adds up the voxel-to-voxel
     /// changes from --minw to --maxw voxels away on each side and keeps the shift with the least change. 0 is
     /// allowed; must not exceed --maxw
     #[arg(long, value_name = "N", default_value_t = 1, help_heading = "Expert")]
@@ -194,7 +194,7 @@ fn check_options(cli: &Cli, shift: &ShiftParams) -> Result<Vec<(PathBuf, PathBuf
         for input in &inputs {
             if canonical(img) == canonical(input) {
                 bail!(
-                    "the output {} is the input image: degibbs never overwrites its input",
+                    "the output {} is the input image: DeGibbs never overwrites its input",
                     img.display()
                 );
             }
@@ -204,7 +204,7 @@ fn check_options(cli: &Cli, shift: &ShiftParams) -> Result<Vec<(PathBuf, PathBuf
             let found = given.unwrap_or_else(|| sidecar::default_path(&cli.input));
             if canonical(side) == canonical(&found) {
                 bail!(
-                    "the output sidecar {} is the input sidecar: degibbs never overwrites its input",
+                    "the output sidecar {} is the input sidecar: DeGibbs never overwrites its input",
                     side.display()
                 );
             }

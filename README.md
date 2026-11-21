@@ -34,7 +34,7 @@ degibbs --full-help                              # everything, including expert 
 ```
 
 > [!IMPORTANT]
-> degibbs never guesses the partial Fourier factor. If the sidecar has no `PartialFourier` (some converters leave it out, and a processed copy often has no sidecar), pass `--pf` (`1` for full Fourier), `--pocs`, or `--json` pointing at the original scan's sidecar. Without one of these degibbs stops with an error.
+> DeGibbs never guesses the partial Fourier factor. If the sidecar has no `PartialFourier` (some converters leave it out, and a processed copy often has no sidecar), pass `--pf` (`1` for full Fourier), `--pocs`, or `--json` pointing at the original scan's sidecar. Without one of these DeGibbs stops with an error.
 
 Existing outputs are never replaced unless you pass `--overwrite`. Every output gets a `.json` beside it with the settings used.
 

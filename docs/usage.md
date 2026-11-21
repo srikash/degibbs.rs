@@ -35,7 +35,7 @@ Read from the input's [sidecar](#bids-sidecar) when not given.
 | `--no-json` | do not read any sidecar | off |
 | `--phase FILE` | phase image in radians; makes the input complex, see [Complex images](#complex-images) | none |
 | `--phase-out FILE` | where to write the corrected phase (required with `--phase`) | none |
-| `--overwrite` | replace output files that already exist | off: degibbs stops instead |
+| `--overwrite` | replace output files that already exist | off: DeGibbs stops instead |
 
 ## Other
 
@@ -54,21 +54,21 @@ The defaults suit almost all data. The names follow MRtrix `mrdegibbs`.
 |---|---|---|
 | `--axes a,b` | the two image axes that form each slice; the plane must contain the phase-encoding axis | `0,1`, or the two axes other than `SliceEncodingDirection` |
 | `--nshifts M` | how finely to search for the best sub-voxel shift: 2M+1 shifts evenly spaced from -1/2 to +1/2 voxel are tried at each voxel. Larger is finer but slower. At most 1000 | `20` (41 shifts) |
-| `--minw N` | nearest distance, in voxels, used to judge ringing. For each trial shift, degibbs adds up the voxel-to-voxel changes from `--minw` to `--maxw` voxels away on each side and keeps the shift with the least change. May be 0; must not exceed `--maxw` | `1` |
+| `--minw N` | nearest distance, in voxels, used to judge ringing. For each trial shift, DeGibbs adds up the voxel-to-voxel changes from `--minw` to `--maxw` voxels away on each side and keeps the shift with the least change. May be 0; must not exceed `--maxw` | `1` |
 | `--maxw N` | farthest distance, in voxels, used to judge ringing. At most 100 | `3` |
 | `--threads N` | number of CPU threads | all CPUs the process may use |
 
-By default degibbs uses every CPU the process is allowed to use, so it respects container limits and Slurm allocations; the `RAYON_NUM_THREADS` environment variable also works. The result does not depend on the thread count. It can differ in the last bits between CPUs with different SIMD support.
+By default DeGibbs uses every CPU the process is allowed to use, so it respects container limits and Slurm allocations; the `RAYON_NUM_THREADS` environment variable also works. The result does not depend on the thread count. It can differ in the last bits between CPUs with different SIMD support.
 
 ## Safety
 
-- degibbs stops if an output file or output sidecar already exists, unless `--overwrite` is given.
-- degibbs never writes over its input, with or without `--overwrite`.
+- DeGibbs stops if an output file or output sidecar already exists, unless `--overwrite` is given.
+- DeGibbs never writes over its input, with or without `--overwrite`.
 - All options are checked before the image is read, so a typo fails at once.
 
 ## Output sidecar
 
-Beside every output image degibbs writes a JSON file with the same name (`out.nii.gz` gives `out.json`). It holds every key of the input sidecar unchanged (so `PhaseEncodingDirection`, `TotalReadoutTime` and the like stay available to later steps), plus one `DeGibbs` object: the version, the full command, the source file name, the resolved phase-encoding axis, slice plane, partial Fourier factor, `Pocs`, `Nshifts`, `Minw`, `Maxw` and `Threads`. With `--phase-out`, the corrected phase gets its own sidecar the same way. If the input sidecar already has a `DeGibbs` object (degibbs run twice), it is replaced.
+Beside every output image DeGibbs writes a JSON file with the same name (`out.nii.gz` gives `out.json`). It holds every key of the input sidecar unchanged (so `PhaseEncodingDirection`, `TotalReadoutTime` and the like stay available to later steps), plus one `DeGibbs` object: the version, the full command, the source file name, the resolved phase-encoding axis, slice plane, partial Fourier factor, `Pocs`, `Nshifts`, `Minw`, `Maxw` and `Threads`. With `--phase-out`, the corrected phase gets its own sidecar the same way. If the input sidecar already has a `DeGibbs` object (DeGibbs run twice), it is replaced.
 
 ## BIDS sidecar
 
@@ -83,7 +83,7 @@ Keys the tool reads:
 Explicit options override the sidecar.
 
 > [!IMPORTANT]
-> degibbs never guesses the partial Fourier factor of a magnitude image. Some DICOM converters leave `PartialFourier` out depending on the scanner, and some write no JSON at all, and a processed copy of a scan often has no sidecar. If the factor is missing, degibbs stops and tells you to pass `--pf 1` (full Fourier), `--pf 6/8` and so on (partial Fourier), or `--pocs` (the scanner already filled in the missing k-space). If only the original scan has a sidecar, pass it with `--json`.
+> DeGibbs never guesses the partial Fourier factor of a magnitude image. Some DICOM converters leave `PartialFourier` out depending on the scanner, and some write no JSON at all, and a processed copy of a scan often has no sidecar. If the factor is missing, DeGibbs stops and tells you to pass `--pf 1` (full Fourier), `--pf 6/8` and so on (partial Fourier), or `--pocs` (the scanner already filled in the missing k-space). If only the original scan has a sidecar, pass it with `--json`.
 
 > [!NOTE]
 > Sidecar axes describe the NIfTI they were written with. They become stale if the image is reoriented afterwards (for example with `fslreorient2std`), and the tool cannot detect this.
@@ -98,7 +98,7 @@ mrconvert dwi_degibbs.nii.gz out.mif -fslgrad dwi.bvec dwi.bval
 
 ## Choosing the partial-Fourier factor
 
-Pass the factor the scan was acquired with. The sidecar's `PartialFourier` sets it automatically, and degibbs stops if it cannot be found.
+Pass the factor the scan was acquired with. The sidecar's `PartialFourier` sets it automatically, and DeGibbs stops if it cannot be found.
 
 | acquired | `--pf` | expected result |
 |---|---|---|
