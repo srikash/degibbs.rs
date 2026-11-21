@@ -198,7 +198,7 @@ fn without_an_input_sidecar_the_output_sidecar_has_only_the_record() {
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(dir.path().join("o.json")).unwrap()).unwrap();
     assert_eq!(v.as_object().unwrap().len(), 1);
-    assert_eq!(v["DeGibbs"]["Pocs"], true);
+    assert_eq!(v["DeGibbs"]["POCS"], true);
 }
 
 #[test]

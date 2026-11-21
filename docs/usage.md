@@ -68,7 +68,7 @@ By default DeGibbs uses every CPU the process is allowed to use, so it respects 
 
 ## Output sidecar
 
-Beside every output image DeGibbs writes a JSON file with the same name (`out.nii.gz` gives `out.json`). It holds every key of the input sidecar unchanged (so `PhaseEncodingDirection`, `TotalReadoutTime` and the like stay available to later steps), plus one `DeGibbs` object: the version, the full command, the source file name, the resolved phase-encoding axis, slice plane, partial Fourier factor, `Pocs`, `Nshifts`, `Minw`, `Maxw` and `Threads`. With `--phase-out`, the corrected phase gets its own sidecar the same way. If the input sidecar already has a `DeGibbs` object (DeGibbs run twice), it is replaced.
+Beside every output image DeGibbs writes a JSON file with the same name (`out.nii.gz` gives `out.json`). It holds every key of the input sidecar unchanged (so `PhaseEncodingDirection`, `TotalReadoutTime` and the like stay available to later steps), plus one `DeGibbs` object: the version, the full command, the source file name, the resolved phase-encoding axis, slice plane, partial Fourier factor, `POCS`, `Nshifts`, `Minw`, `Maxw` and `Threads`. With `--phase-out`, the corrected phase gets its own sidecar the same way. If the input sidecar already has a `DeGibbs` object (DeGibbs run twice), it is replaced.
 
 ## BIDS sidecar
 

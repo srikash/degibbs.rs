@@ -346,7 +346,7 @@ fn run(cli: Cli) -> Result<()> {
         "PhaseEncodingAxis": p.pe_axis,
         "SlicePlaneAxes": [p.pe_axis.min(p.other_axis), p.pe_axis.max(p.other_axis)],
         "PartialFourier": pf_text,
-        "Pocs": cli.pocs,
+        "POCS": cli.pocs,
         "Nshifts": cli.nshifts,
         "Minw": cli.minw,
         "Maxw": cli.maxw,
