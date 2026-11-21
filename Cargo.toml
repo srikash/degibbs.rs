@@ -2,7 +2,14 @@
 name = "degibbs"
 version = "0.4.0"
 edition = "2024"
+rust-version = "1.88"
+description = "Gibbs-ringing removal for MRI NIfTI images by local subvoxel shifts, with partial Fourier support"
+repository = "https://github.com/srikash/degibbs.rs"
+readme = "README.md"
 license-file = "LICENCE"
+keywords = ["mri", "nifti", "gibbs-ringing", "neuroimaging", "denoising"]
+categories = ["science", "command-line-utilities"]
+include = ["src/", "tests/", "Cargo.toml", "Cargo.lock", "README.md", "LICENCE", "CHANGELOG.md", "CITATION.bib", "docs/usage.md", "docs/development.md", "docs/containers.md", "docs/validation.md", "docs/qc_images.png", "docs/qc_profiles.png"]
 
 [dependencies]
 anyhow = "1.0.104"

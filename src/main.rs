@@ -199,12 +199,14 @@ fn check_options(cli: &Cli, shift: &ShiftParams) -> Result<Vec<(PathBuf, PathBuf
                 );
             }
         }
-        if !cli.no_json {
-            let given = cli.json.as_ref().cloned();
-            let found = given.unwrap_or_else(|| sidecar::default_path(&cli.input));
-            if canonical(side) == canonical(&found) {
+        // Whatever --no-json says, an output sidecar must not replace a sidecar that belongs to an input.
+        let mut input_sidecars = vec![sidecar::default_path(&cli.input)];
+        input_sidecars.extend(cli.phase.as_deref().map(sidecar::default_path));
+        input_sidecars.extend(cli.json.clone());
+        for found in &input_sidecars {
+            if canonical(side) == canonical(found) {
                 bail!(
-                    "the output sidecar {} is the input sidecar: DeGibbs never overwrites its input",
+                    "the output sidecar {} is a sidecar of an input: DeGibbs never overwrites its input",
                     side.display()
                 );
             }

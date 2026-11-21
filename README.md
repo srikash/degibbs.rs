@@ -17,7 +17,7 @@ Download the static Linux binary (x86-64) from the [v0.2.1 release](https://gith
 tar xzf degibbs-v0.2.1-x86_64-linux-musl.tar.gz
 ```
 
-Or build from source (needs Rust 1.85 or newer; this puts `degibbs` on your `PATH`):
+Or build from source (needs Rust 1.88 or newer; this puts `degibbs` on your `PATH`):
 
 ```
 cargo install --git https://github.com/srikash/degibbs.rs
@@ -45,6 +45,7 @@ Existing outputs are never replaced unless you pass `--overwrite`. Every output 
 - [Usage](docs/usage.md): options, BIDS sidecar, MRtrix3 and FSL, choosing the partial-Fourier factor, complex images, limits.
 - [Containers](docs/containers.md): Docker, Podman and Apptainer, including a Slurm job.
 - [Validation](docs/validation.md): phantom results and figures.
+- [Development](docs/development.md): tests, checking a change against an earlier build, the phantom validation and the benchmark.
 
 ## Licence and citing
 

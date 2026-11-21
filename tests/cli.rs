@@ -262,3 +262,50 @@ fn a_single_2d_slice_gives_the_same_output_at_any_thread_count() {
     }
     assert_eq!(outs[0], outs[1]);
 }
+
+#[test]
+fn an_output_sidecar_never_replaces_an_input_sidecar() {
+    let (dir, input) = setup();
+    let side = dir.path().join("a.json");
+    std::fs::write(&side, r#"{"PhaseEncodingDirection":"j"}"#).unwrap();
+    // `a.nii.gz` would write `a.json`, the sidecar of `a.nii`, even with --no-json and --overwrite
+    let out = dir.path().join("a.nii.gz");
+    cli()
+        .arg(&input)
+        .arg(&out)
+        .args(["--no-json", "--pe-axis", "j", "--pf", "1", "--overwrite"])
+        .assert()
+        .failure();
+    assert_eq!(
+        std::fs::read_to_string(&side).unwrap(),
+        r#"{"PhaseEncodingDirection":"j"}"#
+    );
+    assert!(!out.exists());
+}
+
+#[test]
+fn more_planes_than_threads_gives_the_same_output_as_one_thread() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("v.nii");
+    let mut v = ArrayD::<f32>::zeros(IxDyn(&[24, 24, 8]).f());
+    for ((x, y, z), p) in v.indexed_iter_mut().map(|(i, p)| ((i[0], i[1], i[2]), p)) {
+        *p = if (6..18).contains(&x) && (6..18).contains(&y) {
+            100.0
+        } else {
+            10.0
+        } + z as f32;
+    }
+    save(&input, v, None);
+    let mut outs = Vec::new();
+    for t in ["1", "4"] {
+        let out = dir.path().join(format!("o{t}.nii"));
+        cli()
+            .arg(&input)
+            .arg(&out)
+            .args(["--pe-axis", "j", "--pf", "7/8", "--threads", t])
+            .assert()
+            .success();
+        outs.push(std::fs::read(&out).unwrap());
+    }
+    assert_eq!(outs[0], outs[1]);
+}

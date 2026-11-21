@@ -30,43 +30,45 @@ fn output_matches_the_reference_build_within_tolerance() {
     let reference = std::env::var("DEGIBBS_REF_BIN").expect("set DEGIBBS_REF_BIN");
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("in.nii");
-    save(&input, volume(64, 64, 4, 3), None);
-    for pf in ["1", "6/8"] {
-        let (old, new) = (dir.path().join("old.nii"), dir.path().join("new.nii"));
-        let _ = (
-            std::fs::remove_file(&old),
-            std::fs::remove_file(&new),
-            std::fs::remove_file(dir.path().join("new.json")),
-        );
-        let args = ["--pe-axis", "j", "--pf", pf];
-        let st = std::process::Command::new(&reference)
-            .arg(&input)
-            .arg(&old)
-            .args(args)
-            .status()
-            .unwrap();
-        assert!(st.success());
-        cli().arg(&input).arg(&new).args(args).assert().success();
-        let (a, b) = (
-            degibbs::io::read(&old).unwrap().data,
-            degibbs::io::read(&new).unwrap().data,
-        );
-        let range =
-            a.iter().cloned().fold(f32::MIN, f32::max) - a.iter().cloned().fold(f32::MAX, f32::min);
-        let mut worst = 0f32;
-        let mut differing = 0usize;
-        for (x, y) in a.iter().zip(b.iter()) {
-            let d = (x - y).abs();
-            if d > 0.0 {
-                differing += 1;
+    for (nx, ny) in [(64usize, 64usize), (63, 61)] {
+        save(&input, volume(nx, ny, 4, 3), None);
+        for pf in ["1", "7/8", "6/8", "5/8"] {
+            let (old, new) = (dir.path().join("old.nii"), dir.path().join("new.nii"));
+            let _ = (
+                std::fs::remove_file(&old),
+                std::fs::remove_file(&new),
+                std::fs::remove_file(dir.path().join("new.json")),
+            );
+            let args = ["--pe-axis", "j", "--pf", pf];
+            let st = std::process::Command::new(&reference)
+                .arg(&input)
+                .arg(&old)
+                .args(args)
+                .status()
+                .unwrap();
+            assert!(st.success());
+            cli().arg(&input).arg(&new).args(args).assert().success();
+            let (a, b) = (
+                degibbs::io::read(&old).unwrap().data,
+                degibbs::io::read(&new).unwrap().data,
+            );
+            let range = a.iter().cloned().fold(f32::MIN, f32::max)
+                - a.iter().cloned().fold(f32::MAX, f32::min);
+            let mut worst = 0f32;
+            let mut differing = 0usize;
+            for (x, y) in a.iter().zip(b.iter()) {
+                let d = (x - y).abs();
+                if d > 0.0 {
+                    differing += 1;
+                }
+                worst = worst.max(d);
             }
-            worst = worst.max(d);
+            println!(
+                "{nx}x{ny} pf {pf}: {differing} of {} voxels differ, largest difference {worst:e} ({:e} of the range {range})",
+                a.len(),
+                worst / range
+            );
+            assert!(worst <= 1e-5 * range, "pf {pf}: largest difference {worst}");
         }
-        println!(
-            "pf {pf}: {differing} of {} voxels differ, largest difference {worst:e} ({:e} of the range {range})",
-            a.len(),
-            worst / range
-        );
-        assert!(worst <= 1e-5 * range, "pf {pf}: largest difference {worst}");
     }
 }
