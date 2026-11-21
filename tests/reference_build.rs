@@ -72,3 +72,55 @@ fn output_matches_the_reference_build_within_tolerance() {
         }
     }
 }
+
+#[test]
+#[ignore = "needs DEGIBBS_REF_BIN"]
+fn the_phase_route_matches_the_reference_build_exactly() {
+    let reference = std::env::var("DEGIBBS_REF_BIN").expect("set DEGIBBS_REF_BIN");
+    let (nx, ny) = (63usize, 61usize);
+    let mag = volume(nx, ny, 4, 3);
+    let mut phase = ArrayD::<f32>::zeros(mag.raw_dim().f());
+    for ((x, y, z, t), p) in phase
+        .indexed_iter_mut()
+        .map(|(i, p)| ((i[0], i[1], i[2], i[3]), p))
+    {
+        *p = (0.05 * x as f32 + 0.03 * y as f32 + 0.2 * z as f32 + 0.1 * t as f32).sin() * 3.0;
+    }
+    let (old_dir, new_dir) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let mut results = Vec::new();
+    for (dir, is_ref) in [(&old_dir, true), (&new_dir, false)] {
+        let (m, ph) = (dir.path().join("m.nii"), dir.path().join("p.nii"));
+        save(&m, mag.clone(), None);
+        save(&ph, phase.clone(), None);
+        let (om, op) = (dir.path().join("om.nii"), dir.path().join("op.nii"));
+        let args = ["--pe-axis", "j", "--pf", "1", "--phase"];
+        if is_ref {
+            let st = std::process::Command::new(&reference)
+                .arg(&m)
+                .arg(&om)
+                .args(args)
+                .arg(&ph)
+                .arg("--phase-out")
+                .arg(&op)
+                .status()
+                .unwrap();
+            assert!(st.success());
+        } else {
+            cli()
+                .arg(&m)
+                .arg(&om)
+                .args(args)
+                .arg(&ph)
+                .arg("--phase-out")
+                .arg(&op)
+                .assert()
+                .success();
+        }
+        results.push((
+            degibbs::io::read(&om).unwrap().data,
+            degibbs::io::read(&op).unwrap().data,
+        ));
+    }
+    assert_eq!(results[0].0, results[1].0, "magnitude differs");
+    assert_eq!(results[0].1, results[1].1, "phase differs");
+}

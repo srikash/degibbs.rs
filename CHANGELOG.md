@@ -23,5 +23,5 @@ The first release with a stability promise: within 0.4.x, option names, defaults
 
 - Two shifted copies share one inverse FFT in the shift search.
 - Slices are copied in and out in parallel, and a single 2D slice or a few slices use all threads.
-- The `--phase` route holds three full volumes in memory instead of five.
+- The `--phase` route holds two full volumes in memory instead of five.
 - `.nii.gz` files are read and written with the faster `zlib-rs` backend.

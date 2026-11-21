@@ -178,6 +178,15 @@ fn check_options(cli: &Cli, shift: &ShiftParams) -> Result<Vec<(PathBuf, PathBuf
         );
     }
     shift.validate()?;
+    for (what, path) in [
+        ("input", Some(&cli.input)),
+        ("--phase", cli.phase.as_ref()),
+        ("--json", cli.json.as_ref()),
+    ] {
+        if let Some(path) = path.filter(|p| !p.exists()) {
+            bail!("{}: no such file ({what})", path.display());
+        }
+    }
 
     // (image, its output sidecar) for every file that will be written
     let mut outs = vec![(cli.output.clone(), sidecar::default_path(&cli.output))];
@@ -313,8 +322,13 @@ fn run(cli: Cli) -> Result<()> {
     let mut img = io::read(&cli.input)?;
     let mut phase_img = None;
     if let Some(path) = &cli.phase {
-        let ph = io::read(path)?;
-        img.imag = Some(combine_magnitude_and_phase(&mut img.data, &ph, path)?);
+        let mut ph = io::read(path)?;
+        combine_magnitude_and_phase(&mut img.data, &mut ph, path)?;
+        // The phase buffer now holds the imaginary part; only the header and extensions of `ph` are kept.
+        img.imag = Some(std::mem::replace(
+            &mut ph.data,
+            ndarray::ArrayD::zeros(ndarray::IxDyn(&[0])),
+        ));
         phase_img = Some(ph);
     }
     if img.data.ndim() != ndim {
@@ -339,28 +353,38 @@ fn run(cli: Cli) -> Result<()> {
         "Threads": threads,
     });
 
-    if let (Some(mut ph), Some(phase_out)) = (phase_img, &cli.phase_out) {
-        {
-            // Back to magnitude and phase, in place: the phase image's buffer receives the new phase.
-            let im = img.imag.take().expect("set when --phase is given");
-            ndarray::Zip::from(&mut ph.data)
-                .and(&im)
-                .and(&img.data)
-                .for_each(|p, &i, &r| *p = i.atan2(r));
-            ndarray::Zip::from(&mut img.data)
-                .and(&im)
-                .for_each(|r, &i| *r = r.hypot(i));
-            drop(im);
-            io::write(phase_out, &ph)?;
-            write_sidecar(&outs[1].1, raw.as_ref(), &record)?;
-        }
+    let mut written = Vec::new();
+    if let (Some(ph), Some(phase_out)) = (phase_img, &cli.phase_out) {
+        // Back to magnitude and phase in place: the imaginary part's buffer receives the phase. Both values are
+        // read before either is written.
+        let mut im = img.imag.take().expect("set when --phase is given");
+        ndarray::Zip::from(&mut im)
+            .and(&mut img.data)
+            .for_each(|i, r| {
+                let (re, imv) = (*r, *i);
+                *i = imv.atan2(re);
+                *r = re.hypot(imv);
+            });
+        io::write(
+            phase_out,
+            &io::Image {
+                data: im,
+                imag: None,
+                header: ph.header,
+                extensions: ph.extensions,
+            },
+        )?;
+        write_sidecar(&outs[1].1, raw.as_ref(), &record)?;
+        written.extend([phase_out.clone(), outs[1].1.clone()]);
     }
     io::write(&cli.output, &img)?;
     write_sidecar(&outs[0].1, raw.as_ref(), &record)?;
+    written.extend([cli.output.clone(), outs[0].1.clone()]);
+    let names: Vec<String> = written.iter().map(|p| p.display().to_string()).collect();
     eprintln!(
         "degibbs: done in {:.1} s: wrote {}",
         started.elapsed().as_secs_f64(),
-        cli.output.display()
+        names.join(", ")
     );
     Ok(())
 }
@@ -379,13 +403,13 @@ fn write_sidecar(path: &Path, input: Option<&Value>, record: &Value) -> Result<(
     std::fs::write(path, text + "\n").with_context(|| format!("writing {}", path.display()))
 }
 
-/// Build the complex image from a magnitude (replaced by its real part) and a phase image in radians.
-/// Returns the imaginary part.
+/// Turn a magnitude image and a phase image in radians into the real part (in `mag`) and the imaginary part
+/// (in `phase.data`), in place.
 fn combine_magnitude_and_phase(
     mag: &mut ndarray::ArrayD<f32>,
-    phase: &io::Image,
+    phase: &mut io::Image,
     path: &std::path::Path,
-) -> Result<ndarray::ArrayD<f32>> {
+) -> Result<()> {
     if phase.imag.is_some() {
         anyhow::bail!("{}: the phase image must not be complex", path.display());
     }
@@ -415,11 +439,12 @@ fn combine_magnitude_and_phase(
             path.display()
         );
     }
-    let im = ndarray::Zip::from(&*mag)
-        .and(&phase.data)
-        .map_collect(|&m, &p| (m as f64 * (p as f64).sin()) as f32);
-    mag.zip_mut_with(&phase.data, |m, &p| {
-        *m = (*m as f64 * (p as f64).cos()) as f32
-    });
-    Ok(im)
+    ndarray::Zip::from(&mut *mag)
+        .and(&mut phase.data)
+        .for_each(|m, p| {
+            let (mm, pp) = (*m as f64, *p as f64);
+            *m = (mm * pp.cos()) as f32;
+            *p = (mm * pp.sin()) as f32;
+        });
+    Ok(())
 }

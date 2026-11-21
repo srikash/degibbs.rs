@@ -309,3 +309,31 @@ fn more_planes_than_threads_gives_the_same_output_as_one_thread() {
     }
     assert_eq!(outs[0], outs[1]);
 }
+
+#[test]
+fn a_missing_input_says_so_plainly_and_before_anything_else() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = cli()
+        .arg(dir.path().join("nope.nii"))
+        .arg(dir.path().join("o.nii"))
+        .args(["--pe-axis", "j", "--pf", "1"])
+        .assert()
+        .failure();
+    let e = stderr(&a);
+    assert!(e.contains("nope.nii: no such file"), "{e}");
+    assert!(!e.contains("Os {"), "{e}");
+}
+
+#[test]
+fn the_end_summary_lists_every_file_written() {
+    let (dir, input) = setup();
+    let out = dir.path().join("o.nii");
+    let a = cli()
+        .arg(&input)
+        .arg(&out)
+        .args(["--pe-axis", "j", "--pf", "1"])
+        .assert()
+        .success();
+    let e = stderr(&a);
+    assert!(e.contains("o.nii") && e.contains("o.json"), "{e}");
+}
