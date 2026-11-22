@@ -17,6 +17,7 @@ jobs:
           targets: x86_64-unknown-linux-musl
       - name: The tag matches the crate version
         run: test "v$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')" = "${GITHUB_REF_NAME}"
+      - run: cargo test --release --locked
       - run: cargo build --release --locked --target x86_64-unknown-linux-musl
       - name: Package
         run: |

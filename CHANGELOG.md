@@ -11,6 +11,10 @@ The first release with a stability promise: within 0.4.x, option names, defaults
 - **A `.json` file is written beside every output** with the input sidecar's keys plus a `DeGibbs` record of the version and the settings used. In the record, `PartialFourier` is a number, axes are `i`, `j`, `k`, and `Command` is an array of arguments.
 - `-h` and `--help` show a short help; the expert options (`--axes`, `--nshifts`, `--minw`, `--maxw`, `--threads`) are in `--full-help`.
 
+### Fixed
+
+- **An output name with extra dots no longer writes over the input.** A name such as `a.fixed.nii` was written as `a.nii` by the NIfTI writer, so `degibbs a.nii a.fixed.nii` replaced the input and reported a file it had not written. Outputs are now written to a temporary name and renamed, so a half-written output is never left behind either.
+
 ### New
 
 - `--pocs`: the scanner already filled in the missing k-space; treat the image as full Fourier.
@@ -20,9 +24,10 @@ The first release with a stability promise: within 0.4.x, option names, defaults
 - Every option is checked before the image is read.
 - Plain-language definitions for every option.
 
-### Faster and lighter
+### Lighter and tidier
 
 - Two shifted copies share one inverse FFT in the shift search.
 - Slices are copied in and out in parallel, and a single 2D slice or a few slices use all threads.
+- On a 4D test image (126 MB compressed) peak memory fell from 320 to 257 MB and the correction itself ran about 4% faster.
 - The `--phase` route holds two full volumes in memory instead of five.
 - `.nii.gz` files use the `zlib-rs` backend. `--pigz` (expert) compresses a `.nii.gz` output with the multi-threaded `pigz` instead: smaller files and quicker writes, with the same image data. The container image includes pigz.

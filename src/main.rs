@@ -174,6 +174,14 @@ fn check_options(cli: &Cli, shift: &ShiftParams) -> Result<Vec<(PathBuf, PathBuf
     if let Some(s) = &cli.axes {
         parse_axes(s)?;
     }
+    if cli.pigz
+        && std::process::Command::new("pigz")
+            .arg("--version")
+            .output()
+            .is_err()
+    {
+        bail!("--pigz: the pigz program was not found on the PATH");
+    }
     let pf = cli.pf.as_deref().map(parse_pf).transpose()?;
     if cli.pocs && pf.is_some_and(|p| p != Pf::Full) {
         bail!(

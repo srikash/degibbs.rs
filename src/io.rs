@@ -94,35 +94,47 @@ pub fn write(path: &Path, img: &Image, threads: usize, pigz: bool) -> Result<()>
         cal_max: 0.0,
         ..img.header.clone()
     };
-    if name.ends_with(".gz") && pigz {
-        write_with_pigz(path, img, &header, threads)
-            .context("--pigz: could not compress with pigz (is it installed?)")?;
-        return Ok(());
-    }
-    write_plain(path, img, &header)
-}
-
-/// Write an uncompressed file beside `path`, then compress it with `pigz`. Any failure leaves nothing behind.
-fn write_with_pigz(path: &Path, img: &Image, header: &NiftiHeader, threads: usize) -> Result<()> {
-    // The writer takes the base name up to the first dot, so the temporary name has no other dots.
-    let tmp = path.with_file_name(format!("degibbs-tmp-{}.nii", std::process::id()));
+    // Write to a temporary name beside the output, then rename. The temporary name has no dots besides the
+    // extension (the nifti writer cuts a name at its first dot, so `a.fixed.nii` would be written as `a.nii`,
+    // over the input), and carries the process id and the time so that parallel jobs in one directory differ.
+    let gz = name.ends_with(".gz");
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let tag = format!("degibbs-tmp-{}-{nanos}", std::process::id());
+    let raw = path.with_file_name(format!("{tag}.nii"));
+    let tmp = if gz {
+        path.with_file_name(format!("{tag}.nii.gz"))
+    } else {
+        raw.clone()
+    };
     let done = (|| {
-        write_plain(&tmp, img, header)?;
-        let out = std::fs::File::create(path)?;
-        let status = std::process::Command::new("pigz")
-            .args(["-n", "-c", "-p", &threads.max(1).to_string()])
-            .arg(&tmp)
-            .stdout(out)
-            .stderr(std::process::Stdio::null())
-            .status()?;
-        anyhow::ensure!(status.success(), "pigz failed");
-        Ok(())
+        if gz && pigz {
+            write_plain(&raw, img, &header)?;
+            run_pigz(&raw, &tmp, threads)
+                .context("--pigz: could not compress with pigz (is it installed?)")?;
+        } else {
+            write_plain(&tmp, img, &header)?;
+        }
+        std::fs::rename(&tmp, path).with_context(|| format!("writing {}", path.display()))
     })();
-    let _ = std::fs::remove_file(&tmp);
+    let _ = std::fs::remove_file(&raw);
     if done.is_err() {
-        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(&tmp);
     }
     done
+}
+
+/// Compress `from` into `to` with `pigz`.
+fn run_pigz(from: &Path, to: &Path, threads: usize) -> Result<()> {
+    let status = std::process::Command::new("pigz")
+        .args(["-n", "-c", "-p", &threads.max(1).to_string()])
+        .arg(from)
+        .stdout(std::fs::File::create(to)?)
+        .stderr(std::process::Stdio::null())
+        .status()?;
+    anyhow::ensure!(status.success(), "pigz failed");
+    Ok(())
 }
 
 fn write_plain(path: &Path, img: &Image, header: &NiftiHeader) -> Result<()> {

@@ -374,17 +374,55 @@ fn pigz_and_the_built_in_compressor_give_the_same_voxels() {
         .assert()
         .failure();
     assert!(!missing.exists());
-    let raw = |p: &std::path::Path| {
-        let mut v = Vec::new();
-        std::io::Read::read_to_end(
-            &mut flate2::read::MultiGzDecoder::new(std::fs::File::open(p).unwrap()),
-            &mut v,
-        )
-        .unwrap();
-        v
-    };
-    assert_eq!(raw(&with), raw(&without));
+    let (a, b) = (
+        degibbs::io::read(&with).unwrap(),
+        degibbs::io::read(&without).unwrap(),
+    );
+    assert_eq!(a.data, b.data);
     // no temporary file is left behind
+    let stray = std::fs::read_dir(dir.path()).unwrap().any(|e| {
+        e.unwrap()
+            .file_name()
+            .to_string_lossy()
+            .contains("degibbs-tmp")
+    });
+    assert!(!stray);
+}
+
+#[test]
+fn pigz_missing_fails_before_the_image_is_read() {
+    let (dir, input) = setup();
+    let out = dir.path().join("o.nii.gz");
+    let a = cli()
+        .env("PATH", "")
+        .arg(&input)
+        .arg(&out)
+        .args(["--pe-axis", "j", "--pocs", "--pigz"])
+        .assert()
+        .failure();
+    assert!(stderr(&a).contains("pigz program was not found"));
+    assert!(!out.exists());
+}
+
+#[test]
+fn an_output_name_with_extra_dots_never_replaces_the_input() {
+    let (dir, input) = setup();
+    let before = std::fs::read(&input).unwrap();
+    for name in ["a.fixed.nii", "a.fixed.nii.gz", "a.b.c.nii.gz"] {
+        let out = dir.path().join(name);
+        cli()
+            .arg(&input)
+            .arg(&out)
+            .args(["--pe-axis", "j", "--pocs", "--overwrite"])
+            .assert()
+            .success();
+        assert!(out.exists(), "{name} was not written");
+        assert_eq!(
+            std::fs::read(&input).unwrap(),
+            before,
+            "input changed by {name}"
+        );
+    }
     let stray = std::fs::read_dir(dir.path()).unwrap().any(|e| {
         e.unwrap()
             .file_name()
