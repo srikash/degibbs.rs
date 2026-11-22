@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+message: "If you use this software, the licence (clause 6) requires you to cite Lee et al. 2021. Please also cite Kellner et al. 2016."
+title: "degibbs.rs"
+type: software
+authors:
+  - family-names: Kashyap
+    given-names: Sriranga
+repository-code: "https://github.com/srikash/degibbs.rs"
+license: NYU-Non-Commercial-Research-License
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Lee
+      given-names: Hong-Hsi
+    - family-names: Novikov
+      given-names: Dmitry S.
+    - family-names: Fieremans
+      given-names: Els
+  title: "Removal of partial Fourier-induced Gibbs (RPG) ringing artifacts in MRI"
+  journal: "Magnetic Resonance in Medicine"
+  year: 2021
+  volume: 86
+  issue: 5
+  start: 2733
+  end: 2750
+  doi: "10.1002/mrm.28830"
+references:
+  - type: article
+    authors:
+      - family-names: Kellner
+        given-names: Elias
+      - family-names: Dhital
+        given-names: Bibek
+      - family-names: Kiselev
+        given-names: Valerij G.
+      - family-names: Reisert
+        given-names: Marco
+    title: "Gibbs-ringing artifact removal based on local subvoxel-shifts"
+    journal: "Magnetic Resonance in Medicine"
+    year: 2016
+    volume: 76
+    issue: 5
+    start: 1574
+    end: 1581
+    doi: "10.1002/mrm.26054"

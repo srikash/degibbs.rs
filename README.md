@@ -59,4 +59,4 @@ Existing outputs are never replaced unless you pass `--overwrite`. Every output 
 
 - Kellner, Dhital, Kiselev, Reisert. Gibbs-ringing artifact removal based on local subvoxel-shifts. *Magn Reson Med* 76(5):1574-1581, 2016. [doi:10.1002/mrm.26054](https://doi.org/10.1002/mrm.26054).
 
-Both references are in [`CITATION.bib`](CITATION.bib) for BibTeX and BibLaTeX.
+Both references are in [`CITATION.bib`](CITATION.bib) for BibTeX and BibLaTeX, and [`CITATION.cff`](CITATION.cff) drives the "Cite this repository" button on GitHub.
