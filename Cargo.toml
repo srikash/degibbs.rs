@@ -9,7 +9,7 @@ readme = "README.md"
 license-file = "LICENCE"
 keywords = ["mri", "nifti", "gibbs-ringing", "neuroimaging", "denoising"]
 categories = ["science", "command-line-utilities"]
-include = ["src/", "tests/", "Cargo.toml", "Cargo.lock", "README.md", "LICENCE", "CHANGELOG.md", "CITATION.bib", "CITATION.cff", "docs/usage.md", "docs/development.md", "docs/containers.md", "docs/validation.md", "docs/qc_images.png", "docs/qc_profiles.png"]
+include = ["src/", "tests/", "Cargo.toml", "Cargo.lock", "README.md", "LICENCE", "CHANGELOG.md", "CITATION.bib", "CITATION.cff", "docs/install.md", "docs/usage.md", "docs/development.md", "docs/containers.md", "docs/validation.md", "docs/qc_images.png", "docs/qc_profiles.png"]
 
 [dependencies]
 anyhow = "1.0.104"

@@ -30,6 +30,6 @@ jobs:
       - name: The crate holds only expected files
         run: |
           cargo package --list --allow-dirty --locked > files.txt
-          if grep -Ev '^(src/|tests/|Cargo\.(toml|lock|toml\.orig)$|README\.md$|LICENCE$|CHANGELOG\.md$|CITATION\.(bib|cff)$|\.cargo_vcs_info\.json$|docs/(usage|development|containers|validation)\.md$|docs/qc_(images|profiles)\.png$)' files.txt; then
+          if grep -Ev '^(src/|tests/|Cargo\.(toml|lock|toml\.orig)$|README\.md$|LICENCE$|CHANGELOG\.md$|CITATION\.(bib|cff)$|\.cargo_vcs_info\.json$|docs/(install|usage|development|containers|validation)\.md$|docs/qc_(images|profiles)\.png$)' files.txt; then
             echo "unexpected files in the crate" >&2; exit 1
           fi

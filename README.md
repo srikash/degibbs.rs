@@ -11,17 +11,14 @@ Gibbs-ringing removal for MRI in pure Rust (assisted in no small part by Claude 
 
 ## Install
 
-Download the static Linux binary (x86-64) from the [v0.4.0 release](https://github.com/srikash/degibbs.rs/releases/tag/v0.4.0). It runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, and Fedora 44.
+Full steps for a native install, Docker, Apptainer and Podman are in [Install](docs/install.md). The short version, on Linux (x86-64, static binary; runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, Fedora 44):
 
 ```
+curl -LO https://github.com/srikash/degibbs.rs/releases/download/v0.4.0/degibbs-v0.4.0-x86_64-linux-musl.tar.gz
 tar xzf degibbs-v0.4.0-x86_64-linux-musl.tar.gz
 ```
 
-Or install from crates.io (needs Rust 1.88 or newer; this puts `degibbs` on your `PATH`):
-
-```
-cargo install degibbs
-```
+Or with Cargo (needs Rust 1.88 or newer; this puts `degibbs` on your `PATH`): `cargo install degibbs`.
 
 ## Run
 
@@ -43,6 +40,7 @@ Existing outputs are never replaced unless you pass `--overwrite`. Every output 
 ## Documentation
 
 - [Usage](docs/usage.md): options, BIDS sidecar, MRtrix3 and FSL, choosing the partial-Fourier factor, complex images, limits.
+- [Install](docs/install.md): native binary or Cargo, Docker, Apptainer and Podman.
 - [Containers](docs/containers.md): Docker, Podman and Apptainer, including a Slurm job.
 - [Validation](docs/validation.md): phantom results and figures.
 - [Development](docs/development.md): tests, checking a change against an earlier build, the phantom validation and the benchmark.
