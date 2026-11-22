@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, the licence (clause 6) requires you to cite Lee et al. 2021. Please also cite Kellner et al. 2016."
 title: "degibbs.rs"
-version: 0.4.0
+version: 0.4.1
 date-released: 2026-11-21
 abstract: "Gibbs-ringing removal for MRI NIfTI images by local subvoxel shifts, with partial Fourier support."
 type: software

@@ -30,7 +30,10 @@ jobs:
         id: v
         env:
           RAW: ${{ github.event.inputs.version || github.ref_name }}
-        run: echo "version=${RAW#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          v="${RAW#v}"
+          echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || { echo "not a version: $v" >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - name: Wait for the crate on crates.io, then choose the tags
         id: tags
         env:
@@ -38,7 +41,9 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -A "degibbs-container-build" "https://crates.io/api/v1/crates/degibbs/${VERSION}")
-            [ "$code" = 200 ] && break
+            # cargo install reads the sparse index, which can lag the API
+            curl -s https://index.crates.io/de/gi/degibbs | grep -q "\"vers\":\"${VERSION}\"" && indexed=1 || indexed=0
+            [ "$code" = 200 ] && [ "$indexed" = 1 ] && break
             [ "$i" = 30 ] && { echo "degibbs ${VERSION} is not on crates.io: publish it first" >&2; exit 1; }
             sleep 30
           done

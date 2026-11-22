@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1
+
+No change to the program: the output is identical to 0.4.0.
+
+- The "Cite this repository" box on GitHub now cites the software. Lee 2021 and Kellner 2016 are listed as references in `CITATION.cff`.
+- The container image is built from the crate published on crates.io, so it always matches `cargo install degibbs`.
+- `latest` is the newest release. The `main` and `sha-<commit>` image tags are no longer published.
+- 0.4.0 was released on GitHub only; 0.4.1 is the first version on crates.io.
+
 ## 0.4.0
 
 The first release with a stability promise: within 0.4.x, option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. With `--pigz` the image values are the same but the `.nii.gz` file bytes differ.

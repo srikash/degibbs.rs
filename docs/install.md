@@ -7,8 +7,8 @@ Pick one. Each ends with a check that prints the version.
 **Download the binary** (Linux, x86-64, static; runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, Fedora 44):
 
 ```
-curl -LO https://github.com/srikash/degibbs.rs/releases/download/v0.4.0/degibbs-v0.4.0-x86_64-linux-musl.tar.gz
-tar xzf degibbs-v0.4.0-x86_64-linux-musl.tar.gz
+curl -LO https://github.com/srikash/degibbs.rs/releases/download/v0.4.1/degibbs-v0.4.1-x86_64-linux-musl.tar.gz
+tar xzf degibbs-v0.4.1-x86_64-linux-musl.tar.gz
 ./degibbs --version
 ```
 
@@ -26,8 +26,8 @@ The optional `--pigz` option needs the [pigz](https://zlib.net/pigz/) program on
 ## 2. Docker
 
 ```
-docker run --rm ghcr.io/srikash/degibbs.rs:0.4.0 --version
-docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.rs:0.4.0 \
+docker run --rm ghcr.io/srikash/degibbs.rs:0.4.1 --version
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.rs:0.4.1 \
     dwi.nii.gz dwi_degibbs.nii.gz --pe-axis j --pf 6/8
 ```
 
@@ -38,9 +38,9 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/data ghcr.io/srikash/degibbs.r
 No `.sif` file is published. Pull the image once, on a login or transfer node, and Apptainer builds it for you:
 
 ```
-apptainer pull degibbs_0.4.0.sif docker://ghcr.io/srikash/degibbs.rs:0.4.0
-apptainer run degibbs_0.4.0.sif --version
-apptainer run degibbs_0.4.0.sif dwi.nii.gz dwi_degibbs.nii.gz --pe-axis j --pf 6/8
+apptainer pull degibbs_0.4.1.sif docker://ghcr.io/srikash/degibbs.rs:0.4.1
+apptainer run degibbs_0.4.1.sif --version
+apptainer run degibbs_0.4.1.sif dwi.nii.gz dwi_degibbs.nii.gz --pe-axis j --pf 6/8
 ```
 
 Add `--bind /path/to/study:/data` for a project or scratch filesystem. A Slurm job example is in [Containers](containers.md).
@@ -50,8 +50,8 @@ Add `--bind /path/to/study:/data` for a project or scratch filesystem. A Slurm j
 The same image works. Use `--userns=keep-id` in place of `-u`, and `:Z` after `/data` on SELinux systems such as Fedora and Rocky:
 
 ```
-podman run --rm ghcr.io/srikash/degibbs.rs:0.4.0 --version
-podman run --rm --userns=keep-id -v "$PWD":/data:Z ghcr.io/srikash/degibbs.rs:0.4.0 \
+podman run --rm ghcr.io/srikash/degibbs.rs:0.4.1 --version
+podman run --rm --userns=keep-id -v "$PWD":/data:Z ghcr.io/srikash/degibbs.rs:0.4.1 \
     dwi.nii.gz dwi_degibbs.nii.gz --pe-axis j --pf 6/8
 ```
 

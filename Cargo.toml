@@ -1,6 +1,6 @@
 [package]
 name = "degibbs"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 rust-version = "1.88"
 description = "Gibbs-ringing removal for MRI NIfTI images by local subvoxel shifts, with partial Fourier support"

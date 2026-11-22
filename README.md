@@ -14,8 +14,8 @@ Gibbs-ringing removal for MRI in pure Rust (assisted in no small part by Claude 
 Full steps for a native install, Docker, Apptainer and Podman are in [Install](docs/install.md). The short version, on Linux (x86-64, static binary; runs on Rocky 9 and 10, Ubuntu 22.04 and 24.04, Fedora 44):
 
 ```
-curl -LO https://github.com/srikash/degibbs.rs/releases/download/v0.4.0/degibbs-v0.4.0-x86_64-linux-musl.tar.gz
-tar xzf degibbs-v0.4.0-x86_64-linux-musl.tar.gz
+curl -LO https://github.com/srikash/degibbs.rs/releases/download/v0.4.1/degibbs-v0.4.1-x86_64-linux-musl.tar.gz
+tar xzf degibbs-v0.4.1-x86_64-linux-musl.tar.gz
 ```
 
 Or with Cargo (needs Rust 1.88 or newer; this puts `degibbs` on your `PATH`): `cargo install degibbs`.
