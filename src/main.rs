@@ -105,17 +105,11 @@ struct Cli {
     /// (respects container and Slurm limits, and RAYON_NUM_THREADS)]
     #[arg(long, value_name = "N", help_heading = "Expert")]
     threads: Option<usize>,
-    /// Compress a .nii.gz output with the external pigz program, which uses several threads: auto uses pigz when
-    /// it is on the PATH, on stops with an error if it cannot run, off always uses the built-in compressor. The
-    /// image data are the same either way; only the compressed bytes differ
-    #[arg(
-        long,
-        value_enum,
-        value_name = "MODE",
-        default_value = "auto",
-        help_heading = "Expert"
-    )]
-    pigz: io::Pigz,
+    /// Compress a .nii.gz output with the external pigz program, which uses several threads. DeGibbs stops with
+    /// an error if pigz cannot run. The image data are the same as with the built-in compressor; only the
+    /// compressed bytes differ
+    #[arg(long, help_heading = "Expert")]
+    pigz: bool,
 }
 
 const EXPERT: [&str; 6] = ["axes", "nshifts", "minw", "maxw", "threads", "pigz"];

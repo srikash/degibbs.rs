@@ -77,21 +77,10 @@ pub fn read(path: &Path) -> Result<Image> {
     })
 }
 
-/// Whether to compress `.gz` outputs with the external `pigz`.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, clap::ValueEnum)]
-pub enum Pigz {
-    /// use pigz when it is on the PATH
-    Auto,
-    /// use pigz, or stop with an error
-    On,
-    /// always use the built-in compressor
-    Off,
-}
-
 /// Write float32 data (complex64 if `imag` is set) with the geometry of `header`; `.gz` extension compresses.
-/// When `pigz` is on the `PATH` it compresses a `.gz` output with `threads` threads, otherwise the built-in
-/// compressor does. Both give the same voxel data; only the compressed bytes differ.
-pub fn write(path: &Path, img: &Image, threads: usize, pigz: Pigz) -> Result<()> {
+/// With `pigz` set, a `.gz` output is compressed by the external `pigz` with `threads` threads instead of the
+/// built-in compressor. Both give the same voxel data; only the compressed bytes differ.
+pub fn write(path: &Path, img: &Image, threads: usize, pigz: bool) -> Result<()> {
     let name = path.to_string_lossy();
     if !(name.ends_with(".nii") || name.ends_with(".nii.gz")) {
         anyhow::bail!(
@@ -105,14 +94,10 @@ pub fn write(path: &Path, img: &Image, threads: usize, pigz: Pigz) -> Result<()>
         cal_max: 0.0,
         ..img.header.clone()
     };
-    if name.ends_with(".gz") && pigz != Pigz::Off {
-        match write_with_pigz(path, img, &header, threads) {
-            Ok(()) => return Ok(()),
-            Err(e) if pigz == Pigz::On => {
-                return Err(e).context("--pigz on: could not compress with pigz");
-            }
-            Err(_) => {}
-        }
+    if name.ends_with(".gz") && pigz {
+        write_with_pigz(path, img, &header, threads)
+            .context("--pigz: could not compress with pigz (is it installed?)")?;
+        return Ok(());
     }
     write_plain(path, img, &header)
 }

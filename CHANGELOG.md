@@ -2,7 +2,7 @@
 
 ## 0.4.0
 
-The first release with a stability promise: within 0.4.x, option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. This is about the image values: `.nii.gz` files compressed with `pigz` differ in file bytes (`--pigz off` removes the difference).
+The first release with a stability promise: within 0.4.x, option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. With `--pigz` the image values are the same but the `.nii.gz` file bytes differ.
 
 ### Changes from 0.2 that can break scripts
 
@@ -16,7 +16,7 @@ The first release with a stability promise: within 0.4.x, option names, defaults
 - `--pocs`: the scanner already filled in the missing k-space; treat the image as full Fourier.
 - `--dry-run`: check the inputs and print the resolved settings without correcting anything.
 - `--overwrite`.
-- `--pigz auto|on|off` (expert).
+- `--pigz` (expert).
 - Every option is checked before the image is read.
 - Plain-language definitions for every option.
 
@@ -25,4 +25,4 @@ The first release with a stability promise: within 0.4.x, option names, defaults
 - Two shifted copies share one inverse FFT in the shift search.
 - Slices are copied in and out in parallel, and a single 2D slice or a few slices use all threads.
 - The `--phase` route holds two full volumes in memory instead of five.
-- `.nii.gz` files use the `zlib-rs` backend, and a `.nii.gz` output is compressed with the multi-threaded `pigz` when it is installed (always in the container image); see `--pigz`. Pigz output is smaller and quicker to write; the image data are the same, but the compressed bytes differ from the built-in compressor's. Use `--pigz off` for byte-for-byte reproducible `.nii.gz` files.
+- `.nii.gz` files use the `zlib-rs` backend. `--pigz` (expert) compresses a `.nii.gz` output with the multi-threaded `pigz` instead: smaller files and quicker writes, with the same image data. The container image includes pigz.

@@ -355,32 +355,25 @@ fn pigz_and_the_built_in_compressor_give_the_same_voxels() {
     cli()
         .arg(&input)
         .arg(&with)
-        .args(["--pe-axis", "j", "--pocs"])
+        .args(["--pe-axis", "j", "--pocs", "--pigz"])
         .assert()
         .success();
     cli()
         .arg(&input)
         .arg(&without)
-        .args(["--pe-axis", "j", "--pocs", "--pigz", "off"])
+        .args(["--pe-axis", "j", "--pocs"])
         .assert()
         .success();
-    // pigz asked for but missing is an error; left on auto it falls back quietly
+    // pigz asked for but missing is an error
     let missing = dir.path().join("m.nii.gz");
     cli()
         .env("PATH", "")
         .arg(&input)
         .arg(&missing)
-        .args(["--pe-axis", "j", "--pocs", "--pigz", "on"])
+        .args(["--pe-axis", "j", "--pocs", "--pigz"])
         .assert()
         .failure();
     assert!(!missing.exists());
-    cli()
-        .env("PATH", "")
-        .arg(&input)
-        .arg(&missing)
-        .args(["--pe-axis", "j", "--pocs"])
-        .assert()
-        .success();
     let raw = |p: &std::path::Path| {
         let mut v = Vec::new();
         std::io::Read::read_to_end(

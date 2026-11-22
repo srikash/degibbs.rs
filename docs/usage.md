@@ -8,7 +8,7 @@ Input may be 2D, 3D or 4D. Every plane spanned by `--axes` is corrected, and all
 
 `degibbs -h` shows the options you normally need. `degibbs --full-help` also shows the expert options. `degibbs --version` prints the version.
 
-**Stability.** Within a minor version (for example every 0.4.x) the option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. This is about the image values: `.nii.gz` files compressed with `pigz` differ in file bytes (`--pigz off` removes the difference). Pin `0.4` in pipelines.
+**Stability.** Within a minor version (for example every 0.4.x) the option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. With `--pigz` the image values are the same but the `.nii.gz` file bytes differ. Pin `0.4` in pipelines.
 
 ## Required
 
@@ -57,9 +57,9 @@ The defaults suit almost all data. The names follow MRtrix `mrdegibbs`.
 | `--minw N` | nearest distance, in voxels, used to judge ringing. For each trial shift, DeGibbs adds up the voxel-to-voxel changes from `--minw` to `--maxw` voxels away on each side and keeps the shift with the least change. May be 0; must not exceed `--maxw` | `1` |
 | `--maxw N` | farthest distance, in voxels, used to judge ringing. At most 100 | `3` |
 | `--threads N` | number of CPU threads | all CPUs the process may use |
-| `--pigz auto\|on\|off` | compress a `.nii.gz` output with the external [pigz](https://zlib.net/pigz/) program, which uses several threads. `auto` uses it when it is on the `PATH`, `on` stops with an error if it cannot run, `off` always uses the built-in compressor. The image data are identical either way; only the compressed bytes differ | `auto` |
+| `--pigz` | compress a `.nii.gz` output with the external [pigz](https://zlib.net/pigz/) program, which uses several threads. DeGibbs stops with an error if pigz cannot run. The image data are identical either way; only the compressed bytes differ | off: the built-in compressor |
 
-By default DeGibbs uses every CPU the process is allowed to use, so it respects container limits and Slurm allocations; the `RAYON_NUM_THREADS` environment variable also works. The result does not depend on the thread count. The container image includes pigz. It can differ in the last bits between CPUs with different SIMD support.
+By default DeGibbs uses every CPU the process is allowed to use, so it respects container limits and Slurm allocations; the `RAYON_NUM_THREADS` environment variable also works. The result does not depend on the thread count. The container image includes pigz for `--pigz`. It can differ in the last bits between CPUs with different SIMD support.
 
 ## Safety
 
