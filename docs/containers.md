@@ -2,9 +2,11 @@
 
 The image is published to the GitHub Container Registry as `ghcr.io/srikash/degibbs.rs`. It is about 18 MB and runs on Intel/AMD and ARM (including Apple silicon) machines.
 
-- `latest` and `main` follow the newest commit.
+- `latest` is the newest release.
 - `0.4.0` is the current release. Use a version tag in analysis scripts so the software stays fixed.
-- `sha-<commit>` pins an exact commit.
+- `0.4` is the newest 0.4.x release.
+
+The image is built from the crate published on crates.io, so it contains exactly what `cargo install degibbs` gives.
 
 The container's entry point is `degibbs`, so everything after the image name is a normal `degibbs` command. Its working directory is `/data`.
 
