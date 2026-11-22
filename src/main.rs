@@ -247,6 +247,20 @@ fn pf_name(pf: Pf, pocs: bool) -> &'static str {
     }
 }
 
+fn axis_letter(a: usize) -> &'static str {
+    ["i", "j", "k"][a]
+}
+
+/// Full Fourier is the integer 1 so that a record reads `1`, not `1.0`.
+fn pf_number(pf: Pf) -> serde_json::Value {
+    match pf {
+        Pf::Full => json!(1),
+        Pf::P78 => json!(0.875),
+        Pf::P68 => json!(0.75),
+        Pf::P58 => json!(0.625),
+    }
+}
+
 fn run(cli: Cli) -> Result<()> {
     let started = Instant::now();
     let shift = ShiftParams {
@@ -341,11 +355,11 @@ fn run(cli: Cli) -> Result<()> {
 
     let record = json!({
         "Version": env!("CARGO_PKG_VERSION"),
-        "Command": std::env::args().collect::<Vec<_>>().join(" "),
+        "Command": std::iter::once("degibbs".to_string()).chain(std::env::args().skip(1)).collect::<Vec<_>>(),
         "Source": cli.input.file_name().map(|n| n.to_string_lossy()).unwrap_or_default(),
-        "PhaseEncodingAxis": p.pe_axis,
-        "SlicePlaneAxes": [p.pe_axis.min(p.other_axis), p.pe_axis.max(p.other_axis)],
-        "PartialFourier": pf_text,
+        "PhaseEncodingAxis": axis_letter(p.pe_axis),
+        "SlicePlaneAxes": [axis_letter(p.pe_axis.min(p.other_axis)), axis_letter(p.pe_axis.max(p.other_axis))],
+        "PartialFourier": pf_number(p.pf),
         "POCS": cli.pocs,
         "Nshifts": cli.nshifts,
         "Minw": cli.minw,

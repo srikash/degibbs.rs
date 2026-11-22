@@ -173,7 +173,10 @@ fn the_output_sidecar_carries_the_input_keys_and_a_degibbs_record() {
     assert_eq!(v["TotalReadoutTime"], 0.05);
     let d = &v["DeGibbs"];
     assert_eq!(d["Version"], env!("CARGO_PKG_VERSION"));
-    assert_eq!(d["PhaseEncodingAxis"], 1);
+    assert_eq!(d["PhaseEncodingAxis"], "j");
+    assert_eq!(d["SlicePlaneAxes"], serde_json::json!(["i", "j"]));
+    assert_eq!(d["PartialFourier"], serde_json::json!(1));
+    assert_eq!(d["Command"][0], "degibbs");
     assert_eq!(d["Nshifts"], 20);
     assert_eq!(d["Threads"], 2);
     assert_eq!(d["Source"], "a.nii");

@@ -8,7 +8,7 @@ The first release with a stability promise: within 0.4.x, option names, defaults
 
 - **The partial Fourier factor of a magnitude image is now required.** It comes from `--pf`, from `PartialFourier` in the sidecar, or from the new `--pocs`. Before, DeGibbs assumed full Fourier with a notice. If your scan was fully sampled, add `--pf 1`; if the scanner already filled in the missing k-space (POCS), add `--pocs`; if only the original scan has a sidecar, add `--json`.
 - **Existing output files are no longer replaced** unless you pass `--overwrite`. DeGibbs never writes over its input.
-- **A `.json` file is written beside every output** with the input sidecar's keys plus a `DeGibbs` record of the version and the settings used.
+- **A `.json` file is written beside every output** with the input sidecar's keys plus a `DeGibbs` record of the version and the settings used. In the record, `PartialFourier` is a number, axes are `i`, `j`, `k`, and `Command` is an array of arguments.
 - `-h` and `--help` show a short help; the expert options (`--axes`, `--nshifts`, `--minw`, `--maxw`, `--threads`) are in `--full-help`.
 
 ### New
