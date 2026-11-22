@@ -6,7 +6,6 @@ authors:
   - family-names: Kashyap
     given-names: Sriranga
 repository-code: "https://github.com/srikash/degibbs.rs"
-license: NYU-Non-Commercial-Research-License
 preferred-citation:
   type: article
   authors:
