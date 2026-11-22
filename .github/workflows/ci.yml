@@ -22,3 +22,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.88
       - run: cargo check --locked
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: The crate holds only expected files
+        run: |
+          cargo package --list --allow-dirty --locked > files.txt
+          if grep -Ev '^(src/|tests/|Cargo\.(toml|lock|toml\.orig)$|README\.md$|LICENCE$|CHANGELOG\.md$|CITATION\.(bib|cff)$|\.cargo_vcs_info\.json$|docs/(usage|development|containers|validation)\.md$|docs/qc_(images|profiles)\.png$)' files.txt; then
+            echo "unexpected files in the crate" >&2; exit 1
+          fi
