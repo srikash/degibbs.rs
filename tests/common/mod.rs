@@ -336,7 +336,7 @@ pub fn save(path: &Path, data: ArrayD<f32>, imag: Option<ArrayD<f32>>) {
         header: header(),
         extensions: None,
     };
-    io::write(path, &img).unwrap();
+    io::write(path, &img, 1, io::Pigz::Off).unwrap();
 }
 
 pub fn cli() -> Command {

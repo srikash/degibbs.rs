@@ -38,7 +38,7 @@ degibbs --full-help                              # everything, including expert 
 
 Existing outputs are never replaced unless you pass `--overwrite`. Every output gets a `.json` beside it with the settings used.
 
-**Stability.** Within a minor version (for example 0.4.x), option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. Pin `0.4` in pipelines.
+**Stability.** Within a minor version (for example 0.4.x), option names, defaults, output format and sidecar keys do not change, and the output is bit-identical for the same input, settings and CPU. This is about the image values: `.nii.gz` files compressed with `pigz` differ in file bytes (`--pigz off` removes the difference). Pin `0.4` in pipelines.
 
 ## Documentation
 

@@ -105,9 +105,20 @@ struct Cli {
     /// (respects container and Slurm limits, and RAYON_NUM_THREADS)]
     #[arg(long, value_name = "N", help_heading = "Expert")]
     threads: Option<usize>,
+    /// Compress a .nii.gz output with the external pigz program, which uses several threads: auto uses pigz when
+    /// it is on the PATH, on stops with an error if it cannot run, off always uses the built-in compressor. The
+    /// image data are the same either way; only the compressed bytes differ
+    #[arg(
+        long,
+        value_enum,
+        value_name = "MODE",
+        default_value = "auto",
+        help_heading = "Expert"
+    )]
+    pigz: io::Pigz,
 }
 
-const EXPERT: [&str; 5] = ["axes", "nshifts", "minw", "maxw", "threads"];
+const EXPERT: [&str; 6] = ["axes", "nshifts", "minw", "maxw", "threads", "pigz"];
 
 /// `-h`/`--help` show the short help, `--full-help` everything. Handled before parsing so the required inputs
 /// are not demanded.
@@ -387,11 +398,13 @@ fn run(cli: Cli) -> Result<()> {
                 header: ph.header,
                 extensions: ph.extensions,
             },
+            threads,
+            cli.pigz,
         )?;
         write_sidecar(&outs[1].1, raw.as_ref(), &record)?;
         written.extend([phase_out.clone(), outs[1].1.clone()]);
     }
-    io::write(&cli.output, &img)?;
+    io::write(&cli.output, &img, threads, cli.pigz)?;
     write_sidecar(&outs[0].1, raw.as_ref(), &record)?;
     written.extend([cli.output.clone(), outs[0].1.clone()]);
     let names: Vec<String> = written.iter().map(|p| p.display().to_string()).collect();

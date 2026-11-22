@@ -340,3 +340,63 @@ fn the_end_summary_lists_every_file_written() {
     let e = stderr(&a);
     assert!(e.contains("o.nii") && e.contains("o.json"), "{e}");
 }
+
+#[test]
+fn pigz_and_the_built_in_compressor_give_the_same_voxels() {
+    if std::process::Command::new("pigz")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        return; // pigz not installed here
+    }
+    let (dir, input) = setup();
+    let (with, without) = (dir.path().join("p.nii.gz"), dir.path().join("b.nii.gz"));
+    cli()
+        .arg(&input)
+        .arg(&with)
+        .args(["--pe-axis", "j", "--pocs"])
+        .assert()
+        .success();
+    cli()
+        .arg(&input)
+        .arg(&without)
+        .args(["--pe-axis", "j", "--pocs", "--pigz", "off"])
+        .assert()
+        .success();
+    // pigz asked for but missing is an error; left on auto it falls back quietly
+    let missing = dir.path().join("m.nii.gz");
+    cli()
+        .env("PATH", "")
+        .arg(&input)
+        .arg(&missing)
+        .args(["--pe-axis", "j", "--pocs", "--pigz", "on"])
+        .assert()
+        .failure();
+    assert!(!missing.exists());
+    cli()
+        .env("PATH", "")
+        .arg(&input)
+        .arg(&missing)
+        .args(["--pe-axis", "j", "--pocs"])
+        .assert()
+        .success();
+    let raw = |p: &std::path::Path| {
+        let mut v = Vec::new();
+        std::io::Read::read_to_end(
+            &mut flate2::read::MultiGzDecoder::new(std::fs::File::open(p).unwrap()),
+            &mut v,
+        )
+        .unwrap();
+        v
+    };
+    assert_eq!(raw(&with), raw(&without));
+    // no temporary file is left behind
+    let stray = std::fs::read_dir(dir.path()).unwrap().any(|e| {
+        e.unwrap()
+            .file_name()
+            .to_string_lossy()
+            .contains("degibbs-tmp")
+    });
+    assert!(!stray);
+}

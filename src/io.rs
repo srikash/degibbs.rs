@@ -77,8 +77,21 @@ pub fn read(path: &Path) -> Result<Image> {
     })
 }
 
+/// Whether to compress `.gz` outputs with the external `pigz`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, clap::ValueEnum)]
+pub enum Pigz {
+    /// use pigz when it is on the PATH
+    Auto,
+    /// use pigz, or stop with an error
+    On,
+    /// always use the built-in compressor
+    Off,
+}
+
 /// Write float32 data (complex64 if `imag` is set) with the geometry of `header`; `.gz` extension compresses.
-pub fn write(path: &Path, img: &Image) -> Result<()> {
+/// When `pigz` is on the `PATH` it compresses a `.gz` output with `threads` threads, otherwise the built-in
+/// compressor does. Both give the same voxel data; only the compressed bytes differ.
+pub fn write(path: &Path, img: &Image, threads: usize, pigz: Pigz) -> Result<()> {
     let name = path.to_string_lossy();
     if !(name.ends_with(".nii") || name.ends_with(".nii.gz")) {
         anyhow::bail!(
@@ -92,8 +105,44 @@ pub fn write(path: &Path, img: &Image) -> Result<()> {
         cal_max: 0.0,
         ..img.header.clone()
     };
+    if name.ends_with(".gz") && pigz != Pigz::Off {
+        match write_with_pigz(path, img, &header, threads) {
+            Ok(()) => return Ok(()),
+            Err(e) if pigz == Pigz::On => {
+                return Err(e).context("--pigz on: could not compress with pigz");
+            }
+            Err(_) => {}
+        }
+    }
+    write_plain(path, img, &header)
+}
+
+/// Write an uncompressed file beside `path`, then compress it with `pigz`. Any failure leaves nothing behind.
+fn write_with_pigz(path: &Path, img: &Image, header: &NiftiHeader, threads: usize) -> Result<()> {
+    // The writer takes the base name up to the first dot, so the temporary name has no other dots.
+    let tmp = path.with_file_name(format!("degibbs-tmp-{}.nii", std::process::id()));
+    let done = (|| {
+        write_plain(&tmp, img, header)?;
+        let out = std::fs::File::create(path)?;
+        let status = std::process::Command::new("pigz")
+            .args(["-n", "-c", "-p", &threads.max(1).to_string()])
+            .arg(&tmp)
+            .stdout(out)
+            .stderr(std::process::Stdio::null())
+            .status()?;
+        anyhow::ensure!(status.success(), "pigz failed");
+        Ok(())
+    })();
+    let _ = std::fs::remove_file(&tmp);
+    if done.is_err() {
+        let _ = std::fs::remove_file(path);
+    }
+    done
+}
+
+fn write_plain(path: &Path, img: &Image, header: &NiftiHeader) -> Result<()> {
     let mut opts = WriterOptions::new(path);
-    opts = opts.reference_header(&header);
+    opts = opts.reference_header(header);
     if let Some(ext) = &img.extensions {
         opts = opts.with_extensions(ext.clone());
     }

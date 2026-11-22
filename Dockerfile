@@ -11,6 +11,7 @@ LABEL org.opencontainers.image.title="degibbs" \
       org.opencontainers.image.description="Gibbs-ringing removal for MRI with partial-Fourier support" \
       org.opencontainers.image.source="https://github.com/srikash/degibbs.rs" \
       org.opencontainers.image.licenses="LicenseRef-NYU-Non-Commercial-Research"
+RUN apk add --no-cache pigz
 COPY --from=build /src/target/release/degibbs /usr/local/bin/degibbs
 COPY LICENCE /licenses/degibbs.rs-LICENCE
 WORKDIR /data
