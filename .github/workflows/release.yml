@@ -1,0 +1,36 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  binary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - name: The tag matches the crate version
+        run: test "v$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')" = "${GITHUB_REF_NAME}"
+      - run: cargo build --release --locked --target x86_64-unknown-linux-musl
+      - name: Package
+        run: |
+          d="degibbs-${GITHUB_REF_NAME}-x86_64-linux-musl"
+          tar czf "$d.tar.gz" -C target/x86_64-unknown-linux-musl/release degibbs -C "$PWD" LICENCE
+          sha256sum "$d.tar.gz" > "$d.tar.gz.sha256"
+          ./target/x86_64-unknown-linux-musl/release/degibbs --version
+      - name: Release notes from the changelog
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## "v"$" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          test -s notes.md
+          printf '\nContainer: ghcr.io/%s:%s (linux/amd64 and linux/arm64). A static x86-64 Linux binary is attached.\n' "${GITHUB_REPOSITORY}" "$v" >> notes.md
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" degibbs-*.tar.gz* --title "degibbs.rs ${GITHUB_REF_NAME#v}" --notes-file notes.md
